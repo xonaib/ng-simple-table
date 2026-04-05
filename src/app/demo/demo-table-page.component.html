@@ -1,0 +1,34 @@
+<div class="demo-header">
+  <div>
+    <h1 class="demo-title">simple-table</h1>
+    <p class="demo-subtitle">
+      Declarative Angular Material table with sorting, multi-select, column filters, and pagination.
+    </p>
+  </div>
+
+  @if (selectedTasks().length > 0) {
+    <div class="selection-badge">
+      {{ selectedTasks().length }} task{{ selectedTasks().length === 1 ? '' : 's' }} selected
+    </div>
+  }
+</div>
+
+<div class="table-container">
+  <simple-table
+    [dataSource]="pagedTasks()"
+    [tableColumns]="columns"
+    [tableConfig]="tableConfig"
+    [length]="totalCount()"
+    [columnFiltersData]="filtersData"
+    (page)="onPage($event)"
+    (sortChange)="onSortChange($event)"
+    (filterChange)="onFilterChange($event)"
+    (selectionChange)="onSelectionChange($event)"
+  >
+    <!-- custom cell template for the title column — the header is auto-generated
+         inside simple-table so mat-sort-header works on all columns uniformly -->
+    <ng-template cellDef="title" let-row>
+      <a class="task-title-link">{{ row.title }}</a>
+    </ng-template>
+  </simple-table>
+</div>
