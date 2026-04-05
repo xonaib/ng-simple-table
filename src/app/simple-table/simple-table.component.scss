@@ -1,0 +1,67 @@
+:host {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.simple-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  // ---- header ----
+
+  th.mat-mdc-header-cell {
+    background-color: var(--mat-sys-surface-variant);
+    border-bottom: 2px solid var(--mat-sys-outline-variant);
+    padding: 10px 12px;
+    position: relative;
+    white-space: nowrap;
+
+    &.filter-col {
+      padding-right: 32px;
+    }
+
+    // show filter icon on hover
+    &:hover column-filter .filter-toggle,
+    &.filter-applied column-filter .filter-toggle {
+      opacity: 1;
+    }
+  }
+
+  // ---- cells ----
+
+  td.mat-mdc-cell {
+    font-size: 14px;
+    color: var(--mat-sys-on-surface);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    padding: 10px 12px;
+  }
+
+  // ---- rows ----
+
+  tr.mat-mdc-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--mat-sys-surface-container-low);
+    }
+
+    &.selected-row {
+      background-color: var(--mat-sys-secondary-container);
+    }
+  }
+
+  // ---- checkbox column ----
+
+  .mat-column-select {
+    width: 40px;
+    padding-right: 0;
+  }
+}
+
+// ---- paginator ----
+
+mat-paginator {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}

@@ -1,0 +1,49 @@
+.demo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  flex-wrap: wrap;
+}
+
+.demo-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--mat-sys-on-surface);
+}
+
+.demo-subtitle {
+  font-size: 14px;
+  color: var(--mat-sys-on-surface-variant);
+  margin: 0;
+}
+
+.selection-badge {
+  align-self: center;
+  padding: 6px 16px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table-container {
+  margin: 0 24px 24px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.task-title-link {
+  color: var(--mat-sys-primary);
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
