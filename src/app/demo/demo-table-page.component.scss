@@ -20,6 +20,13 @@
   margin: 0;
 }
 
+.demo-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .selection-badge {
   align-self: center;
   padding: 6px 16px;
@@ -36,6 +43,15 @@
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 8px;
   overflow: hidden;
+}
+
+.table-loading-bar {
+  opacity: 0;
+  transition: opacity 150ms ease;
+
+  &.visible {
+    opacity: 1;
+  }
 }
 
 .task-title-link {

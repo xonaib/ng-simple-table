@@ -1,19 +1,19 @@
 <table
   class="simple-table"
   mat-table
-  [dataSource]="_data"
+  [dataSource]="tableConfig().clientSide ? _matDs : _data()"
   matSort
   (matSortChange)="onSortChange($event)"
 >
-
   <!-- checkbox column -->
   <ng-container matColumnDef="select">
-    <th mat-header-cell *matHeaderCellDef style="width: 40px;">
+    <th mat-header-cell *matHeaderCellDef style="width: 40px">
       <mat-checkbox
         (change)="$event ? masterToggle() : null"
         [checked]="selection.hasValue() && isAllSelected()"
         [indeterminate]="selection.hasValue() && !isAllSelected()"
-        [aria-label]="checkboxLabel()">
+        [aria-label]="checkboxLabel()"
+      >
       </mat-checkbox>
     </th>
     <td mat-cell *matCellDef="let row">
@@ -21,33 +21,42 @@
         (click)="$event.stopPropagation()"
         (change)="$event ? selection.toggle(row) : null"
         [checked]="selection.isSelected(row)"
-        [aria-label]="checkboxLabel(row)">
+        [aria-label]="checkboxLabel(row)"
+      >
       </mat-checkbox>
     </td>
   </ng-container>
 
   <!-- all data columns: header always auto-generated (so mat-sort-header works);
-       cell uses a custom ffCellDef template when provided, otherwise renders the value directly -->
+       cell uses a custom cellDef template when provided, otherwise renders the value directly -->
   @for (column of _dataColumns; track column.columnDef) {
     <ng-container [matColumnDef]="column.columnDef">
-      <th mat-header-cell *matHeaderCellDef
-          mat-sort-header [disabled]="!column.isSortable"
-          [class.filter-col]="column.hasColumnFilters">
-        {{ (column.header ?? column.columnDef) | titlecase }}
+      <th
+        mat-header-cell
+        *matHeaderCellDef
+        mat-sort-header
+        [disabled]="!column.isSortable"
+        [class.filter-col]="column.hasColumnFilters"
+      >
+        {{ column.header ?? column.columnDef | titlecase }}
 
         @if (column.hasColumnFilters) {
           <column-filter
-            [filter]="columnFilters.get(column.columnDef)"
+            [filter]="columnFilters().get(column.columnDef)"
             [column]="column"
             (filterApplied)="onFilterApplied(column.columnDef, $event)"
             (filterCleared)="onFilterCleared($event)"
-            (click)="$event.stopPropagation()">
+            (click)="$event.stopPropagation()"
+          >
           </column-filter>
         }
       </th>
       <td mat-cell *matCellDef="let row">
         @if (customCellTemplates.get(column.columnDef); as cellTmpl) {
-          <ng-container [ngTemplateOutlet]="cellTmpl" [ngTemplateOutletContext]="{ $implicit: row }"></ng-container>
+          <ng-container
+            [ngTemplateOutlet]="cellTmpl"
+            [ngTemplateOutletContext]="{ $implicit: row }"
+          ></ng-container>
         } @else {
           {{ row[column.columnDef] }}
         }
@@ -55,21 +64,22 @@
     </ng-container>
   }
 
-  <tr mat-header-row *matHeaderRowDef="_headers; sticky: stickyHeaders"></tr>
+  <tr mat-header-row *matHeaderRowDef="_headers; sticky: stickyHeaders()"></tr>
   <tr
     mat-row
-    *matRowDef="let row; columns: _headers;"
+    *matRowDef="let row; columns: _headers"
     [class.selected-row]="selection.isSelected(row)"
-    (click)="selection.toggle(row)">
-  </tr>
+    (click)="selection.toggle(row)"
+  ></tr>
 </table>
 
-@if (tableConfig.isPaginated) {
+@if (tableConfig().isPaginated) {
   <mat-paginator
-    [length]="length"
-    [pageSize]="tableConfig.paginationOptions?.defaultPageSize ?? 10"
-    [pageSizeOptions]="tableConfig.paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
+    [length]="tableConfig().clientSide ? _matDs.filteredData.length : length()"
+    [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"
+    [pageSizeOptions]="tableConfig().paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
     (page)="onPageChange($event)"
-    showFirstLastButtons>
+    showFirstLastButtons
+  >
   </mat-paginator>
 }
