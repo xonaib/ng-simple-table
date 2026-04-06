@@ -1,16 +1,15 @@
 import {
   AfterContentInit,
   ChangeDetectionStrategy,
-  ChangeDetectorRef,
   Component,
-  ContentChildren,
   DestroyRef,
-  EventEmitter,
-  Input,
-  Output,
-  QueryList,
   TemplateRef,
+  contentChildren,
+  effect,
   inject,
+  input,
+  output,
+  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet, TitleCasePipe } from '@angular/common';
@@ -48,7 +47,6 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SimpleTableComponent<T> implements AfterContentInit {
-  private readonly _cdr = inject(ChangeDetectorRef);
   private readonly _destroyRef = inject(DestroyRef);
 
   // ---- selection model ----
@@ -58,161 +56,110 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   private _sort?: MatSort;
 
   /** custom cell templates provided by the host via [cellDef] */
-  @ContentChildren(CellDefDirective) cellDefs!: QueryList<CellDefDirective>;
+  readonly cellDefs = contentChildren(CellDefDirective);
 
   // ---- inputs ----
 
-  @Input()
-  get dataSource(): T[] | Observable<T[]> { return this._dataSource!; }
-  set dataSource(value: T[] | Observable<T[]>) {
-    this._dataSource = value;
-    if (this._isInit) {
-      this._switchDataSource(value);
-    }
-  }
-  private _dataSource?: T[] | Observable<T[]>;
-
-  @Input()
-  get tableColumns(): ColumnDef[] { return this._colsDef; }
-  set tableColumns(value: ColumnDef[]) {
-    if (Array.isArray(value)) {
-      this._colsDef = value;
-    }
-  }
-  private _colsDef: ColumnDef[] = [];
-
-  @Input()
-  get tableConfig(): TableConfig { return this._tableConfig; }
-  set tableConfig(value: TableConfig) {
-    this._tableConfig = value ?? {};
-  }
-  private _tableConfig: TableConfig = {};
-
-  /** total record count — used for server-side pagination */
-  @Input()
-  get length(): number { return this._length; }
-  set length(value: number) {
-    this._length = Math.max(0, Number(value) || 0);
-  }
-  private _length = 0;
-
-  @Input()
-  get columnFiltersData(): ColumnFiltersData | Observable<ColumnFiltersData> | undefined {
-    return this._filtersSource;
-  }
-  set columnFiltersData(value: ColumnFiltersData | Observable<ColumnFiltersData> | undefined) {
-    this._filtersSource = value;
-    if (this._isInit) {
-      this._subscribeToFilters();
-    }
-  }
-  private _filtersSource?: ColumnFiltersData | Observable<ColumnFiltersData>;
-
-  @Input() stickyHeaders = false;
-
-  /** pre-select rows programmatically; pass a new array reference to update */
-  @Input()
-  set selectedRows(value: T[]) {
-    this.selection.clear();
-    if (value?.length) {
-      this.selection.select(...value);
-    }
-  }
+  readonly dataSource    = input.required<T[] | Observable<T[]>>();
+  readonly tableColumns  = input.required<ColumnDef[]>();
+  readonly tableConfig   = input<TableConfig>({});
+  readonly length        = input(0);
+  readonly columnFiltersData = input<ColumnFiltersData | Observable<ColumnFiltersData> | undefined>();
+  readonly stickyHeaders = input(false);
+  readonly selectedRows  = input<T[] | undefined>();
 
   // ---- outputs ----
 
   /** emits Angular Material's PageEvent on pagination change */
-  @Output() readonly page = new EventEmitter<PageEvent>();
+  readonly page            = output<PageEvent>();
   /** emits full array of currently selected rows */
-  @Output() readonly selectionChange = new EventEmitter<T[]>();
+  readonly selectionChange = output<T[]>();
   /** emits the current filter map keyed by columnDef when Apply or Clear is clicked */
-  @Output() readonly filterChange = new EventEmitter<Map<string, ItemParent>>();
+  readonly filterChange    = output<Map<string, ItemParent>>();
   /** emits Angular Material's Sort object on column sort change */
-  @Output() readonly sortChange = new EventEmitter<Sort>();
+  readonly sortChange      = output<Sort>();
 
   // ---- internal state (template-accessible) ----
 
-  _data: T[] = [];
+  readonly _data    = signal<T[]>([]);
   _headers: string[] = [];
   _dataColumns: ColumnDef[] = [];
-  readonly columnFilters = new Map<string, ItemParent>();
+  readonly columnFilters = signal<Map<string, ItemParent>>(new Map());
   readonly customCellTemplates = new Map<string, TemplateRef<{ $implicit: unknown }>>();
 
-  private _isInit = false;
+  constructor() {
+    effect(() => { this._switchDataSource(this.dataSource()); });
+    effect(() => { this._subscribeToFilters(this.columnFiltersData()); });
+    effect(() => {
+      const rows = this.selectedRows();
+      this.selection.clear();
+      if (rows?.length) this.selection.select(...rows);
+    });
+  }
 
   // ---- lifecycle ----
 
   ngAfterContentInit(): void {
-    this._isInit = true;
-
     this._populateColumns();
-    this._subscribeToData();
-    this._subscribeToFilters();
     this._subscribeToSelection();
   }
 
   // ---- data source ----
 
-  private _subscribeToData(): void {
-    if (!this._dataSource) return;
-    const stream = isObservable(this._dataSource)
-      ? this._dataSource
-      : observableOf(this._dataSource as T[]);
+  private _switchDataSource(value: T[] | Observable<T[]>): void {
+    this._data.set([]);
+    const stream = isObservable(value)
+      ? value
+      : observableOf(value as T[]);
 
     stream.pipe(takeUntilDestroyed(this._destroyRef)).subscribe((data: T[]) => {
-      this._data = data ?? [];
-      this._cdr.markForCheck();
+      this._data.set(data ?? []);
     });
-  }
-
-  private _switchDataSource(value: T[] | Observable<T[]>): void {
-    this._data = [];
-    this._dataSource = value;
-    this._subscribeToData();
   }
 
   // ---- filters ----
 
-  private _subscribeToFilters(): void {
-    if (!this._filtersSource) return;
-    const stream = isObservable(this._filtersSource)
-      ? this._filtersSource
-      : observableOf(this._filtersSource as ColumnFiltersData);
+  private _subscribeToFilters(source: ColumnFiltersData | Observable<ColumnFiltersData> | undefined): void {
+    if (!source) return;
+    const stream = isObservable(source)
+      ? source
+      : observableOf(source as ColumnFiltersData);
 
     stream.pipe(takeUntilDestroyed(this._destroyRef)).subscribe((data: ColumnFiltersData) => {
-      this.columnFilters.clear();
-      data.parents.forEach(p => this.columnFilters.set(String(p.id), p));
-      this._cdr.markForCheck();
+      const map = new Map<string, ItemParent>();
+      data.parents.forEach(p => map.set(String(p.id), p));
+      this.columnFilters.set(map);
     });
   }
 
   onFilterApplied(columnDef: string, parent: ItemParent): void {
-    this.columnFilters.set(columnDef, parent);
-    this.filterChange.emit(new Map(this.columnFilters));
+    const map = new Map(this.columnFilters());
+    map.set(columnDef, parent);
+    this.columnFilters.set(map);
+    this.filterChange.emit(new Map(map));
   }
 
   onFilterCleared(columnDef: string): void {
-    const current = this.columnFilters.get(columnDef);
+    const map = new Map(this.columnFilters());
+    const current = map.get(columnDef);
     if (current) {
-      this.columnFilters.set(columnDef, { ...current, selectedKeys: [] });
+      map.set(columnDef, { ...current, selectedKeys: [] });
     }
-    this.filterChange.emit(new Map(this.columnFilters));
+    this.columnFilters.set(map);
+    this.filterChange.emit(new Map(map));
   }
 
   // ---- columns ----
 
   private _populateColumns(): void {
-    // build custom cell template map from cellDef directives
     this.customCellTemplates.clear();
-    this.cellDefs.forEach(d => this.customCellTemplates.set(d.columnDef, d.template));
+    this.cellDefs().forEach(d => this.customCellTemplates.set(d.columnDef(), d.template));
 
     this._headers = [];
     this._dataColumns = [];
 
-    this._colsDef.forEach((col: ColumnDef) => {
+    this.tableColumns().forEach((col: ColumnDef) => {
       this._headers.push(col.columnDef);
-      // all non-select columns are rendered by the @for loop in the template;
-      // custom cell content is provided via customCellTemplates
       if (col.columnDef !== 'select') {
         this._dataColumns.push(col);
       }
@@ -230,15 +177,15 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   }
 
   isAllSelected(): boolean {
-    if (!this._data?.length) return false;
-    return this.selection.selected.length === this._data.length;
+    if (!this._data()?.length) return false;
+    return this.selection.selected.length === this._data().length;
   }
 
   masterToggle(): void {
     if (this.isAllSelected()) {
       this.selection.clear();
     } else {
-      this.selection.select(...this._data);
+      this.selection.select(...this._data());
     }
   }
 

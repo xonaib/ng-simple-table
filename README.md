@@ -181,3 +181,9 @@ multi-select, pagination, and a custom cell template on the Title column.
 ## License
 
 MIT
+
+## References
+https://www.npmjs.com/package/dynamic-mat-table
+https://github.com/relair/material-dynamic-table
+https://github.com/arditsinani/mat-dynamic-table
+https://github.com/lukekroon/ngx-mat-dynamic-table

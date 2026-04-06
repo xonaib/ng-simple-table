@@ -1,7 +1,7 @@
 <table
   class="simple-table"
   mat-table
-  [dataSource]="_data"
+  [dataSource]="_data()"
   matSort
   (matSortChange)="onSortChange($event)"
 >
@@ -27,7 +27,7 @@
   </ng-container>
 
   <!-- all data columns: header always auto-generated (so mat-sort-header works);
-       cell uses a custom ffCellDef template when provided, otherwise renders the value directly -->
+       cell uses a custom cellDef template when provided, otherwise renders the value directly -->
   @for (column of _dataColumns; track column.columnDef) {
     <ng-container [matColumnDef]="column.columnDef">
       <th mat-header-cell *matHeaderCellDef
@@ -37,7 +37,7 @@
 
         @if (column.hasColumnFilters) {
           <column-filter
-            [filter]="columnFilters.get(column.columnDef)"
+            [filter]="columnFilters().get(column.columnDef)"
             [column]="column"
             (filterApplied)="onFilterApplied(column.columnDef, $event)"
             (filterCleared)="onFilterCleared($event)"
@@ -55,7 +55,7 @@
     </ng-container>
   }
 
-  <tr mat-header-row *matHeaderRowDef="_headers; sticky: stickyHeaders"></tr>
+  <tr mat-header-row *matHeaderRowDef="_headers; sticky: stickyHeaders()"></tr>
   <tr
     mat-row
     *matRowDef="let row; columns: _headers;"
@@ -64,11 +64,11 @@
   </tr>
 </table>
 
-@if (tableConfig.isPaginated) {
+@if (tableConfig().isPaginated) {
   <mat-paginator
-    [length]="length"
-    [pageSize]="tableConfig.paginationOptions?.defaultPageSize ?? 10"
-    [pageSizeOptions]="tableConfig.paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
+    [length]="length()"
+    [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"
+    [pageSizeOptions]="tableConfig().paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
     (page)="onPageChange($event)"
     showFirstLastButtons>
   </mat-paginator>

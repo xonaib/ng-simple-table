@@ -1,14 +1,13 @@
 import {
   ChangeDetectionStrategy,
-  ChangeDetectorRef,
   Component,
   ElementRef,
-  EventEmitter,
   HostListener,
-  Input,
-  Output,
-  ViewChild,
-  inject,
+  computed,
+  input,
+  output,
+  signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -25,117 +24,96 @@ import { ColumnDef, FilterType, Item, ItemParent } from '../table.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ColumnFilterComponent {
-  private readonly _cdr = inject(ChangeDetectorRef);
+  readonly column = input.required<ColumnDef>();
+  readonly filter = input<ItemParent | undefined>();
 
-  @ViewChild('toggleButton') toggleButton!: ElementRef<HTMLElement>;
-  @ViewChild('filterMenu') filterMenu!: ElementRef<HTMLElement>;
+  readonly filterApplied = output<ItemParent>();
+  readonly filterCleared = output<string>();
 
-  @Input() column!: ColumnDef;
-
-  @Input()
-  get filter(): ItemParent | undefined { return this._filter; }
-  set filter(value: ItemParent | undefined) {
-    if (value != null && value !== this._filter) {
-      this._filter = value;
-    }
-  }
-  private _filter: ItemParent | undefined;
-
-  @Output() readonly filterApplied = new EventEmitter<ItemParent>();
-  @Output() readonly filterCleared = new EventEmitter<string>();
+  readonly toggleButton = viewChild<ElementRef<HTMLElement>>('toggleButton');
+  readonly filterMenu   = viewChild<ElementRef<HTMLElement>>('filterMenu');
 
   readonly FilterType = FilterType;
 
-  isMenuOpen = false;
-  searchTerm = '';
-  sortDirection: 'asc' | 'desc' | null = null;
-  popupStyle: { top: string; left: string } = { top: '0', left: '0' };
+  readonly isMenuOpen    = signal(false);
+  readonly searchTerm    = signal('');
+  readonly sortDirection = signal<'asc' | 'desc' | null>(null);
+  readonly popupStyle    = signal({ top: '0px', left: '0px' });
 
-  // local working copy of selectedKeys while the menu is open
-  private _pendingKeys = new Set<number | string>();
+  private readonly _pendingKeys = signal<ReadonlySet<number | string>>(new Set());
 
-  get filteredItems(): Item[] {
-    if (!this._filter?.children) return [];
-    const term = this.searchTerm.toLowerCase();
+  readonly filteredItems = computed((): Item[] => {
+    const filter = this.filter();
+    if (!filter?.children) return [];
+    const term = this.searchTerm().toLowerCase();
+    const dir = this.sortDirection();
     let items = term
-      ? this._filter.children.filter(i => i.value.toLowerCase().includes(term))
-      : [...this._filter.children];
-    if (this.sortDirection === 'asc') items = [...items].sort((a, b) => a.value.localeCompare(b.value));
-    if (this.sortDirection === 'desc') items = [...items].sort((a, b) => b.value.localeCompare(a.value));
+      ? filter.children.filter(i => i.value.toLowerCase().includes(term))
+      : [...filter.children];
+    if (dir === 'asc') items = [...items].sort((a, b) => a.value.localeCompare(b.value));
+    if (dir === 'desc') items = [...items].sort((a, b) => b.value.localeCompare(a.value));
     return items;
-  }
+  });
 
-  get isFilterActive(): boolean {
-    return (this._filter?.selectedKeys?.length ?? 0) > 0;
-  }
+  readonly isFilterActive = computed(() => (this.filter()?.selectedKeys?.length ?? 0) > 0);
 
   @HostListener('document:click', ['$event.target'])
   onDocumentClick(target: EventTarget | null): void {
-    if (!this.isMenuOpen) return;
+    if (!this.isMenuOpen()) return;
     const el = target as Node | null;
-    const clickedToggle = this.toggleButton?.nativeElement?.contains(el);
-    const clickedMenu = this.filterMenu?.nativeElement?.contains(el);
+    const clickedToggle = this.toggleButton()?.nativeElement?.contains(el);
+    const clickedMenu   = this.filterMenu()?.nativeElement?.contains(el);
     if (!clickedToggle && !clickedMenu) {
-      this.isMenuOpen = false;
-      this._cdr.markForCheck();
+      this.isMenuOpen.set(false);
     }
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    if (!this.isMenuOpen) return;
-    this.isMenuOpen = false;
-    this._cdr.markForCheck();
+    if (this.isMenuOpen()) this.isMenuOpen.set(false);
   }
 
   toggleMenu(): void {
-    if (!this.isMenuOpen) {
-      // copy current applied selection into working set
-      this._pendingKeys = new Set(this._filter?.selectedKeys ?? []);
-      // position the popup relative to the viewport so it escapes table cell overflow
-      const rect = this.toggleButton.nativeElement.getBoundingClientRect();
-      this.popupStyle = {
-        top: `${rect.bottom + 4}px`,
-        left: `${rect.left}px`,
-      };
+    if (!this.isMenuOpen()) {
+      this._pendingKeys.set(new Set(this.filter()?.selectedKeys ?? []));
+      const rect = this.toggleButton()!.nativeElement.getBoundingClientRect();
+      this.popupStyle.set({ top: `${rect.bottom + 4}px`, left: `${rect.left}px` });
     }
-    this.isMenuOpen = !this.isMenuOpen;
+    this.isMenuOpen.set(!this.isMenuOpen());
   }
 
   isSelected(id: number | string): boolean {
-    return this._pendingKeys.has(id);
+    return this._pendingKeys().has(id);
   }
 
   toggleItem(id: number | string): void {
-    if (this._pendingKeys.has(id)) {
-      this._pendingKeys.delete(id);
-    } else {
-      this._pendingKeys.add(id);
-    }
+    const next = new Set(this._pendingKeys());
+    next.has(id) ? next.delete(id) : next.add(id);
+    this._pendingKeys.set(next);
   }
 
   selectAll(): void {
-    this._filter?.children?.forEach(i => this._pendingKeys.add(i.id));
+    this._pendingKeys.set(new Set(this.filter()?.children?.map(i => i.id)));
   }
 
   clearSelections(): void {
-    this._pendingKeys.clear();
+    this._pendingKeys.set(new Set());
   }
 
   setSortDirection(dir: 'asc' | 'desc'): void {
-    this.sortDirection = this.sortDirection === dir ? null : dir;
+    this.sortDirection.set(this.sortDirection() === dir ? null : dir);
   }
 
   applyFilter(): void {
-    if (!this._filter) return;
-    const applied: ItemParent = { ...this._filter, selectedKeys: [...this._pendingKeys] };
-    this.filterApplied.emit(applied);
-    this.isMenuOpen = false;
+    const f = this.filter();
+    if (!f) return;
+    this.filterApplied.emit({ ...f, selectedKeys: [...this._pendingKeys()] });
+    this.isMenuOpen.set(false);
   }
 
   clearFilter(): void {
-    this._pendingKeys.clear();
-    this.filterCleared.emit(this.column.columnDef);
-    this.isMenuOpen = false;
+    this._pendingKeys.set(new Set());
+    this.filterCleared.emit(this.column().columnDef);
+    this.isMenuOpen.set(false);
   }
 }

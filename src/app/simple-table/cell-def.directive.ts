@@ -1,4 +1,4 @@
-import { Directive, Input, TemplateRef } from '@angular/core';
+import { Directive, TemplateRef, inject, input } from '@angular/core';
 
 /** marks an ng-template as a custom cell template for a given column */
 @Directive({
@@ -6,6 +6,6 @@ import { Directive, Input, TemplateRef } from '@angular/core';
   standalone: true,
 })
 export class CellDefDirective {
-  @Input('cellDef') columnDef!: string;
-  constructor(public readonly template: TemplateRef<{ $implicit: unknown }>) {}
+  readonly columnDef = input.required<string>({ alias: 'cellDef' });
+  readonly template = inject(TemplateRef<{ $implicit: unknown }>);
 }

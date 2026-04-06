@@ -2,30 +2,30 @@
   class="filter-toggle"
   #toggleButton
   type="button"
-  [class.filter-active]="isFilterActive"
-  [class.menu-open]="isMenuOpen"
+  [class.filter-active]="isFilterActive()"
+  [class.menu-open]="isMenuOpen()"
   (click)="toggleMenu()"
-  [attr.aria-label]="'Filter ' + (column.header ?? column.columnDef)"
-  [attr.aria-expanded]="isMenuOpen"
+  [attr.aria-label]="'Filter ' + (column().header ?? column().columnDef)"
+  [attr.aria-expanded]="isMenuOpen()"
 >
   <mat-icon>filter_list</mat-icon>
 </button>
 
-@if (isMenuOpen) {
-  <div class="filter-popup" #filterMenu role="dialog" [attr.aria-label]="'Filter options for ' + (column.header ?? column.columnDef)" [style.top]="popupStyle.top" [style.left]="popupStyle.left">
+@if (isMenuOpen()) {
+  <div class="filter-popup" #filterMenu role="dialog" [attr.aria-label]="'Filter options for ' + (column().header ?? column().columnDef)" [style.top]="popupStyle().top" [style.left]="popupStyle().left">
 
     <div class="filter-header">
-      <span>Filter: {{ column.header ?? column.columnDef }}</span>
+      <span>Filter: {{ column().header ?? column().columnDef }}</span>
     </div>
 
-    @if (column.filterType === FilterType.DropDown) {
+    @if (column().filterType === FilterType.DropDown) {
       <div class="filter-sort-select">
         <button mat-button type="button" class="select-all-btn" (click)="selectAll()">Select All</button>
         <div class="sort-buttons">
           <button
             mat-icon-button
             type="button"
-            [class.sorted]="sortDirection === 'asc'"
+            [class.sorted]="sortDirection() === 'asc'"
             (click)="setSortDirection('asc')"
             aria-label="Sort ascending"
           >
@@ -34,7 +34,7 @@
           <button
             mat-icon-button
             type="button"
-            [class.sorted]="sortDirection === 'desc'"
+            [class.sorted]="sortDirection() === 'desc'"
             (click)="setSortDirection('desc')"
             aria-label="Sort descending"
           >
@@ -46,13 +46,13 @@
       <div class="filter-search-container">
         <div class="filter-search-bar">
           <mat-icon class="search-icon">search</mat-icon>
-          <input type="text" placeholder="Search" [(ngModel)]="searchTerm" aria-label="Search filter options" />
+          <input type="text" placeholder="Search" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" aria-label="Search filter options" />
         </div>
       </div>
 
       <div class="filter-list-scroll">
         <ul class="filter-list">
-          @for (item of filteredItems; track item.id) {
+          @for (item of filteredItems(); track item.id) {
             <li>
               <mat-checkbox
                 [checked]="isSelected(item.id)"
