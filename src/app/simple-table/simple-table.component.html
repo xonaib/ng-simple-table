@@ -1,7 +1,7 @@
 <table
   class="simple-table"
   mat-table
-  [dataSource]="_data()"
+  [dataSource]="tableConfig().clientSide ? _matDs : _data()"
   matSort
   (matSortChange)="onSortChange($event)"
 >
@@ -75,7 +75,7 @@
 
 @if (tableConfig().isPaginated) {
   <mat-paginator
-    [length]="length()"
+    [length]="tableConfig().clientSide ? _matDs.filteredData.length : length()"
     [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"
     [pageSizeOptions]="tableConfig().paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
     (page)="onPageChange($event)"

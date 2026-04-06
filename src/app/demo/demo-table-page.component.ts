@@ -1,6 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { EMPTY, switchMap } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { SimpleTableComponent } from '../simple-table/simple-table.component';
 import { CellDefDirective } from '../simple-table/cell-def.directive';
 import {
@@ -11,16 +17,18 @@ import {
   TableConfig,
 } from '../simple-table/table.types';
 import { Task, TASKS } from './demo-data';
+import { TasksResponse } from './tasks.interceptor';
 
 @Component({
   selector: 'app-demo-table-page',
   standalone: true,
-  imports: [SimpleTableComponent, CellDefDirective],
+  imports: [SimpleTableComponent, CellDefDirective, MatButtonToggleModule, MatProgressBarModule],
   templateUrl: './demo-table-page.component.html',
   styleUrl: './demo-table-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DemoTablePageComponent {
+  private readonly _http = inject(HttpClient);
 
   // ---- column definitions ----
 
@@ -35,62 +43,83 @@ export class DemoTablePageComponent {
     { columnDef: 'storyPoints', header: 'Points',      isSortable: true },
   ];
 
-  readonly tableConfig: TableConfig = {
+  // ---- mode toggle ----
+
+  readonly isClientSide = signal(false);
+
+  readonly effectiveConfig = computed((): TableConfig => ({
     isPaginated: true,
     paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
-  };
+    clientSide: this.isClientSide(),
+  }));
 
-  // ---- filter data derived from the full task list ----
+  // ---- filter options (derived once from the full dataset) ----
 
   readonly filtersData: ColumnFiltersData = this._buildFiltersData();
 
-  // ---- reactive state ----
+  // ---- server-side state signals ----
 
-  private readonly _allTasks = signal<Task[]>(TASKS);
   private readonly _activeFilters = signal<Map<string, ItemParent>>(new Map());
-  private readonly _sortState = signal<Sort | null>(null);
-  private readonly _pageIndex = signal(0);
-  private readonly _pageSize = signal(10);
+  private readonly _sortState     = signal<Sort | null>(null);
+  readonly _pageIndex             = signal(0);   // non-private: passed to simple-table [pageIndex]
+  private readonly _pageSize      = signal(10);
 
-  /** tasks after filters and sort are applied */
-  private readonly _filteredTasks = computed(() => {
-    let tasks = this._allTasks();
+  // ---- HTTP params (server-side mode) ----
 
-    // apply column filters
-    const filters = this._activeFilters();
-    for (const [columnDef, parent] of filters) {
-      const keys = parent.selectedKeys ?? [];
-      if (keys.length > 0) {
-        const keySet = new Set(keys.map(k => String(k)));
-        tasks = tasks.filter(t => keySet.has(String(t[columnDef as keyof Task])));
-      }
-    }
-
-    // apply sort
+  private readonly _serverSideParams = computed((): Record<string, string> => {
+    const params: Record<string, string> = {
+      page: String(this._pageIndex()),
+      size: String(this._pageSize()),
+    };
     const sort = this._sortState();
     if (sort?.active && sort.direction) {
-      const dir = sort.direction === 'asc' ? 1 : -1;
-      const key = sort.active as keyof Task;
-      tasks = [...tasks].sort((a, b) => {
-        const av = a[key];
-        const bv = b[key];
-        if (av == null) return dir;
-        if (bv == null) return -dir;
-        return av < bv ? -dir : av > bv ? dir : 0;
-      });
+      params['sort']      = sort.active;
+      params['direction'] = sort.direction;
     }
-
-    return tasks;
+    for (const [col, parent] of this._activeFilters()) {
+      const keys = parent.selectedKeys ?? [];
+      if (keys.length > 0) params[col] = keys.map(String).join(',');
+    }
+    return params;
   });
 
-  /** total count for the paginator */
-  readonly totalCount = computed(() => this._filteredTasks().length);
+  // Combined trigger so switching modes also fires a new request.
+  private readonly _queryTrigger = computed(() => ({
+    clientSide: this.isClientSide(),
+    params:     this._serverSideParams(),
+  }));
 
-  /** current page slice bound to the table */
-  readonly pagedTasks = computed(() => {
-    const start = this._pageIndex() * this._pageSize();
-    return this._filteredTasks().slice(start, start + this._pageSize());
-  });
+  // ---- loading + HTTP response ----
+
+  readonly isLoading = signal(false);
+
+  private readonly _serverResponse = toSignal(
+    toObservable(this._queryTrigger).pipe(
+      switchMap(({ clientSide, params }) => {
+        if (clientSide) {
+          this.isLoading.set(false);
+          return EMPTY;
+        }
+        this.isLoading.set(true);
+        return this._http.get<TasksResponse>('/api/tasks', { params }).pipe(
+          tap(() => this.isLoading.set(false)),
+        );
+      }),
+    ),
+    { initialValue: { data: [] as Task[], total: 0 } },
+  );
+
+  // ---- data bound to the table ----
+
+  /** full dataset in client-side mode; current page slice returned by the API in server-side mode */
+  readonly effectiveDataSource = computed<Task[]>(() =>
+    this.isClientSide() ? TASKS : (this._serverResponse()?.data ?? [])
+  );
+
+  /** ignored by the table in client-side mode (it counts rows itself) */
+  readonly effectiveLength = computed(() =>
+    this.isClientSide() ? 0 : (this._serverResponse()?.total ?? 0)
+  );
 
   // ---- selection state ----
 
@@ -120,20 +149,15 @@ export class DemoTablePageComponent {
   // ---- helpers ----
 
   private _buildFiltersData(): ColumnFiltersData {
-    const assignees = this._uniqueValues('assignee');
-    const statuses  = this._uniqueValues('status');
-    const priorities = this._uniqueValues('priority');
+    const unique = (key: keyof Task) =>
+      [...new Set(TASKS.map(t => String(t[key])))].sort();
 
     return {
       parents: [
-        { id: 'assignee',  children: assignees.map(v  => ({ id: v,  value: v  })) },
-        { id: 'status',    children: statuses.map(v   => ({ id: v,  value: v  })) },
-        { id: 'priority',  children: priorities.map(v => ({ id: v,  value: v  })) },
+        { id: 'assignee', children: unique('assignee').map(v => ({ id: v, value: v })) },
+        { id: 'status',   children: unique('status').map(v   => ({ id: v, value: v })) },
+        { id: 'priority', children: unique('priority').map(v => ({ id: v, value: v })) },
       ],
     };
-  }
-
-  private _uniqueValues(key: keyof Task): string[] {
-    return [...new Set(TASKS.map(t => String(t[key])))].sort();
   }
 }

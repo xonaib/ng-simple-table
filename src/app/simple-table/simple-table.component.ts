@@ -10,13 +10,14 @@ import {
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet, TitleCasePipe } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatIconModule } from '@angular/material/icon';
 import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
 import { Observable, isObservable, of as observableOf } from 'rxjs';
@@ -47,8 +48,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   // ---- selection model ----
   readonly selection = new SelectionModel<T>(true, []);
 
-  // ---- sort ref (used to reset active state when needed) ----
-  private _sort?: MatSort;
+  // ---- view children (used for client-side mode) ----
+  private readonly _sortRef = viewChild(MatSort);
+  private readonly _paginatorRef = viewChild(MatPaginator);
 
   /** custom cell templates provided by the host via [cellDef] */
   readonly cellDefs = contentChildren(CellDefDirective);
@@ -59,6 +61,12 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly tableColumns = input.required<ColumnDef[]>();
   readonly tableConfig = input<TableConfig>({});
   readonly length = input(0);
+  /**
+   * Current page index for server-side pagination. When provided the paginator
+   * is synced to this value, keeping it aligned when the host resets the page
+   * after a sort or filter change. Has no effect in client-side mode.
+   */
+  readonly pageIndex = input<number | undefined>(undefined);
   readonly columnFiltersData = input<
     ColumnFiltersData | Observable<ColumnFiltersData> | undefined
   >();
@@ -84,6 +92,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly columnFilters = signal<Map<string, ItemParent>>(new Map());
   readonly customCellTemplates = new Map<string, TemplateRef<{ $implicit: unknown }>>();
 
+  /** owned MatTableDataSource used when clientSide: true */
+  readonly _matDs = new MatTableDataSource<T>();
+
   constructor() {
     effect(() => {
       this._switchDataSource(this.dataSource());
@@ -96,6 +107,48 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       this.selection.clear();
       if (rows?.length) this.selection.select(...rows);
     });
+    // sync data into MatTableDataSource in client-side mode
+    effect(() => {
+      if (this.tableConfig().clientSide) {
+        this._matDs.data = this._data();
+      }
+    });
+    // in server-side mode, sync the paginator's visual page when the host resets the index
+    // (e.g. after a sort or filter change). Setting pageIndex directly does not emit a (page)
+    // event so there is no risk of a feedback loop.
+    effect(() => {
+      if (!this.tableConfig().clientSide) {
+        const pi = this.pageIndex();
+        const paginator = this._paginatorRef();
+        if (pi !== undefined && paginator) paginator.pageIndex = pi;
+      }
+    });
+    // connect MatSort and MatPaginator to MatTableDataSource whenever clientSide is enabled.
+    // using an effect (not ngAfterViewInit) so this also fires when the host toggles clientSide
+    // after the view has already been initialised.
+    effect(() => {
+      if (this.tableConfig().clientSide) {
+        const sort = this._sortRef();
+        const paginator = this._paginatorRef();
+        if (sort) this._matDs.sort = sort;
+        if (paginator) this._matDs.paginator = paginator;
+      } else {
+        this._matDs.sort = null;
+        this._matDs.paginator = null;
+      }
+    });
+
+    this._matDs.filterPredicate = (row: T) => {
+      const filters = this.columnFilters();
+      for (const [col, parent] of filters) {
+        const keys = parent.selectedKeys ?? [];
+        if (keys.length > 0) {
+          const keySet = new Set(keys.map((k) => String(k)));
+          if (!keySet.has(String((row as Record<string, unknown>)[col]))) return false;
+        }
+      }
+      return true;
+    };
   }
 
   // ---- lifecycle ----
@@ -136,6 +189,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     map.set(columnDef, parent);
     this.columnFilters.set(map);
     this.filterChange.emit(new Map(map));
+    if (this.tableConfig().clientSide) {
+      this._syncMatDsFilter(map);
+    }
   }
 
   onFilterCleared(columnDef: string): void {
@@ -146,6 +202,17 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     }
     this.columnFilters.set(map);
     this.filterChange.emit(new Map(map));
+    if (this.tableConfig().clientSide) {
+      this._syncMatDsFilter(map);
+    }
+  }
+
+  private _syncMatDsFilter(map: Map<string, ItemParent>): void {
+    const hasActive = [...map.values()].some((p) => (p.selectedKeys?.length ?? 0) > 0);
+    this._matDs.filter = hasActive ? 'active' : '';
+    if (this._matDs.paginator) {
+      this._matDs.paginator.firstPage();
+    }
   }
 
   // ---- columns ----
@@ -175,16 +242,35 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       });
   }
 
+  /**
+   * In server-side mode the host already passes only the current page slice, so
+   * _data() is the right reference. In client-side mode MatTableDataSource owns
+   * paging, so we derive the visible rows from its paginator instead.
+   */
+  private _visibleRows(): T[] {
+    if (this.tableConfig().clientSide) {
+      const p = this._matDs.paginator;
+      if (p) {
+        const start = p.pageIndex * p.pageSize;
+        return this._matDs.filteredData.slice(start, start + p.pageSize);
+      }
+      return this._matDs.filteredData;
+    }
+    return this._data();
+  }
+
   isAllSelected(): boolean {
-    if (!this._data()?.length) return false;
-    return this.selection.selected.length === this._data().length;
+    const rows = this._visibleRows();
+    if (!rows.length) return false;
+    return rows.every((r) => this.selection.isSelected(r));
   }
 
   masterToggle(): void {
+    const rows = this._visibleRows();
     if (this.isAllSelected()) {
-      this.selection.clear();
+      this.selection.deselect(...rows);
     } else {
-      this.selection.select(...this._data());
+      this.selection.select(...rows);
     }
   }
 

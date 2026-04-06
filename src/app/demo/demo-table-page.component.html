@@ -6,19 +6,37 @@
     </p>
   </div>
 
-  @if (selectedTasks().length > 0) {
-    <div class="selection-badge">
-      {{ selectedTasks().length }} task{{ selectedTasks().length === 1 ? '' : 's' }} selected
-    </div>
-  }
+  <div class="demo-controls">
+    <mat-button-toggle-group
+      [value]="isClientSide() ? 'client' : 'server'"
+      (change)="isClientSide.set($event.value === 'client')"
+      aria-label="Data mode"
+    >
+      <mat-button-toggle value="server">Server-side</mat-button-toggle>
+      <mat-button-toggle value="client">Client-side</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (selectedTasks().length > 0) {
+      <div class="selection-badge">
+        {{ selectedTasks().length }} task{{ selectedTasks().length === 1 ? '' : 's' }} selected
+      </div>
+    }
+  </div>
 </div>
 
 <div class="table-container">
+  <mat-progress-bar
+    class="table-loading-bar"
+    mode="indeterminate"
+    [class.visible]="isLoading()"
+  ></mat-progress-bar>
+
   <simple-table
-    [dataSource]="pagedTasks()"
+    [dataSource]="effectiveDataSource()"
     [tableColumns]="columns"
-    [tableConfig]="tableConfig"
-    [length]="totalCount()"
+    [tableConfig]="effectiveConfig()"
+    [length]="effectiveLength()"
+    [pageIndex]="isClientSide() ? undefined : _pageIndex()"
     [columnFiltersData]="filtersData"
     (page)="onPage($event)"
     (sortChange)="onSortChange($event)"

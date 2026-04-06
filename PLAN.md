@@ -58,7 +58,91 @@ from decorator-based API to Angular 17+ signal primitives.
 
 ---
 
-## V2 — Planned
+## V2 — In Progress
+
+### Client-Side Data Mode ✅
+
+When the host passes a plain `T[]` (not paged), the table handles sort, filter, and pagination
+internally via `MatTableDataSource` so the host doesn't need to wire up computed signals.
+
+- `clientSide: boolean` flag in `TableConfig` (default `false`)
+- Internally owns and connects `MatTableDataSource<T>` to `MatSort` and `MatPaginator` via signal `effect()` — works correctly when the host toggles `clientSide` at runtime, not just on init
+- Column filters drive `MatTableDataSource.filterPredicate`; `_syncMatDsFilter` resets to page 1 on filter change
+- `filterChange`, `sortChange`, and `page` outputs still fire for observability
+- `length` input ignored — data source counts rows itself
+- Master toggle and `isAllSelected()` scoped to the current page via `_visibleRows()` (uses `_matDs.filteredData` + paginator slice in client-side mode; uses `_data()` in server-side mode)
+- `pageIndex` input added — in server-side mode the host passes the current page index so the paginator visually resets when sort or filter forces a return to page 1
+
+### Server-Side HTTP Demo ✅
+
+Demonstrates server-side pagination, sorting, and filtering via a real `HttpClient` request
+intercepted in-process — no backend required.
+
+- `TasksInterceptor` (`src/app/demo/tasks.interceptor.ts`) — functional interceptor matching `/api/tasks`; parses `page`, `size`, `sort`, `direction`, and per-column filter params; filters, sorts, and slices the in-memory `TASKS` array; returns a 300 ms delayed `HttpResponse<TasksResponse>`
+- `provideHttpClient(withInterceptors([tasksInterceptor]))` registered in `app.config.ts`
+- Demo component drives requests reactively: `_serverSideParams` computed → `_queryTrigger` computed → `toObservable` + `switchMap` + `toSignal`; `switchMap` cancels in-flight requests on rapid changes
+- `isLoading` signal drives a `mat-progress-bar` above the table
+- Demo toggle: **Server-side** (HTTP + interceptor) ↔ **Client-side** (`MatTableDataSource`)
+
+---
+
+### Column Chooser
+
+Allow users to show or hide columns at runtime via a panel inside the table header area.
+
+- `showColumnChooser: boolean` in `TableConfig` (default `false`) — renders a column chooser button in the table toolbar
+- Panel is a `MatMenu` or overlay listing all columns with toggle checkboxes; the `select` built-in column is always excluded
+- `ColumnDef.hideable?: boolean` (default `true`) — set to `false` to lock a column (e.g. a required ID column) so it always appears and cannot be toggled off
+- Hidden columns are removed from `_headers` and `_dataColumns` in the template; sort/filter state for hidden columns is preserved so re-showing them restores their state
+- `columnVisibilityChange` output — emits the full `ColumnDef[]` with updated `hidden` flags whenever visibility changes; host can persist this if needed
+- Demo page: column chooser enabled by default so all features are visible together
+
+---
+
+### User Settings Persistence
+
+Remember per-user table configuration (visible columns, column widths, column order) across
+sessions. The storage backend is controlled by a flag so the host chooses where state lives.
+
+**`TableUserSettings` interface**
+```typescript
+interface TableUserSettings {
+  hiddenColumns: string[];          // columnDef keys of hidden columns
+  columnOrder:   string[];          // ordered list of columnDef keys (maps to displayIndex)
+  columnWidths:  Record<string, number>; // columnDef key → pixel width
+}
+```
+
+**Persistence modes** — set via `TableConfig.persistSettings`:
+
+| Mode | Behaviour |
+|---|---|
+| `'none'` (default) | No persistence; component is stateless across sessions |
+| `'local'` | Auto-save/load from `localStorage` using `TableConfig.settingsKey` |
+| `'server'` | Host owns persistence — table loads from `[userSettings]` input and emits changes via `(settingsChange)` output |
+
+**`TableConfig` additions**
+- `persistSettings?: 'none' | 'local' | 'server'`
+- `settingsKey?: string` — required when `persistSettings: 'local'`; scopes the key so multiple tables on one page don't collide
+
+**Inputs / outputs for server mode**
+- `userSettings = input<TableUserSettings | undefined>()` — host passes the loaded settings object; table applies them on init and whenever the input changes
+- `settingsChange = output<TableUserSettings>()` — emits the full settings snapshot whenever columns, widths, or order change; host persists to its own endpoint
+
+**Column widths**
+- Requires resizable column headers — drag handle on each `<th>` boundary, `ResizeObserver` on the table to track pixel widths
+- Minimum column width enforced (e.g. 60 px) so columns cannot be collapsed to zero
+
+**Column order**
+- `ColumnDef.displayIndex` is already reserved in the type — user drag-to-reorder in the header populates this
+- Column reorder in headers uses Angular CDK drag-drop (same dependency as the row reorder feature)
+- `columnOrderChange` output for observability (also captured inside `settingsChange`)
+
+**Demo additions**
+- Toggle: `'local'` storage vs. `'server'` (mock) vs. `'none'`
+- "Reset settings" button that clears localStorage or calls the mock server endpoint
+
+---
 
 ### Nested / Expandable Rows
 
@@ -68,14 +152,7 @@ from decorator-based API to Angular 17+ signal primitives.
 - Second `*matRowDef` in template renders full-width expansion panel via `NgTemplateOutlet`
 - Recursive by default — host can nest `<simple-table>` inside the expansion template
 
-### Inline Row Editing
-
-- `isEditable: boolean` added to `ColumnDef`
-- `editDef` content directive for custom edit-mode cell templates
-- Active edit row tracked in `signal<T | null>(null)`
-- Auto-generates `<input>` for editable columns with no custom `editDef`
-- `rowSave` and `rowCancel` outputs
-- Edit/confirm/cancel rendered in a dedicated actions column
+---
 
 ### Drag & Drop Row Reordering
 
@@ -84,32 +161,45 @@ from decorator-based API to Angular 17+ signal primitives.
 - `drag` built-in column for the drag handle (`cdkDragHandle`)
 - `rowReorder` output emits `{ previousIndex, currentIndex, data: T[] }`
 
-### Client-Side Data Mode
-
-When the host passes a plain `T[]` (not paged), the table should handle sort, filter, and pagination internally so the host doesn't need to wire up computed signals.
-
-- `clientSide: boolean` flag in `TableConfig` (default `false` to keep current behaviour)
-- When `true`, `SimpleTableComponent` owns a `MatTableDataSource<T>` internally — sort, filter, and paginator are connected automatically
-- Column filters drive `MatTableDataSource.filterPredicate` rather than emitting to the host
-- `filterChange` and `sortChange` outputs still fire for observability, but the host no longer needs to act on them
-- `length` input becomes optional/ignored — the data source counts rows itself
-- Demo page gains a toggle to switch between client-side and server-side mode to showcase both
+---
 
 ### Theming & Style Customisation
 
-Allow hosts to control the visual appearance without forking the component.
+- Expose `--st-*` CSS custom properties for row height, header background, border colour, selected-row highlight, hover colour, scrollbar colours
+- `TableConfig.maxHeight?: string` — fixed-height scrollable body with sticky header
+- Sensible Material-aligned defaults; no override required for standard usage
+- Document full token list in README; demo gains a live-preview panel
 
-- Expose a set of CSS custom properties (`--st-*`) for the most common overrides: row height, header background, header text colour, border colour, selected-row highlight, hover colour, scrollbar track/thumb colours
-- Wrap the table in a fixed-height container with `overflow-y: auto` when a `maxHeight` option is set in `TableConfig` — gives a scrollable body with a sticky header
-- `TableConfig.maxHeight?: string` (e.g. `'400px'`, `'60vh'`) controls the container; unset means no scroll constraint (current behaviour)
-- All CSS custom properties have sensible Material-aligned defaults so the table looks correct out of the box
-- Document the full token list in README with a copy-paste override block
-- Demo page gains a "Custom theme" panel that live-previews a few overrides
+---
+
+### Sticky / Fixed Columns
+
+Pin columns to the left or right edge so they remain visible when the table scrolls horizontally.
+Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-container matColumnDef>` natively — this feature wires that up declaratively via `ColumnDef`.
+
+**`ColumnDef` additions**
+- `sticky?: 'left' | 'right'` — `'left'` maps to `[sticky]="true"`, `'right'` maps to `[stickyEnd]="true"`; omitting the property means no pinning (current behaviour)
+
+**Template changes**
+- Each `<ng-container [matColumnDef]>` receives `[sticky]` and `[stickyEnd]` bindings driven by `column.sticky`
+- The `select` checkbox column and any future built-in columns (`expand`, `drag`) also respect the flag so hosts can pin them
+- The table wrapper gets `overflow-x: auto` when any sticky columns are present, allowing horizontal scroll while pinned columns stay fixed
+
+**`TableConfig` addition**
+- `TableConfig.horizontalScroll?: boolean` — explicit opt-in for horizontal scroll (auto-enabled when any `sticky` column is detected, but can also be forced without pinned columns)
+
+**Interaction with User Settings**
+- Sticky state is part of the column definition supplied by the host, not a user-adjustable setting — it is therefore intentionally excluded from `TableUserSettings`
+- If the Column Chooser is active, sticky columns are visually distinguished (e.g. a pin icon) and their `hideable` flag defaults to `false` to prevent the table from becoming unusable
+
+**Demo additions**
+- `id` column pinned `'left'`, `storyPoints` column pinned `'right'` to demonstrate both directions simultaneously
+
+---
 
 ### Other V2
 
 - Date range column filter (`MatDatepicker`)
-- Column visibility toggle (`showColumnsToggle` in `TableConfig`)
 - Server-side sort/filter/page model (`serverSide: boolean` flag)
 - Export to CSV utility
 
@@ -117,6 +207,7 @@ Allow hosts to control the visual appearance without forking the component.
 
 ## V3 — Future
 
+- Inline row editing (`isEditable` on `ColumnDef`, `editDef` content directive, `rowSave`/`rowCancel` outputs) — keeping editor out of the grid scope until unavoidable
 - Virtual scrolling (`CdkVirtualScrollViewport`) for large datasets
 - `ng-packagr` library build — publish to npm
 - Storybook stories per feature

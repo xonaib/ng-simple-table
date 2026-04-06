@@ -14,6 +14,12 @@ export interface TableConfig {
   isPaginated?: boolean;
   paginationOptions?: PaginationOptions;
   tableWidth?: string;
+  /**
+   * When true the table owns sort, filter, and pagination internally via
+   * MatTableDataSource. The host can pass the full unsliced dataset and skip
+   * wiring up page/sort/filter event handlers.
+   */
+  clientSide?: boolean;
 }
 
 export interface PaginationOptions {
