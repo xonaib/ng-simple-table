@@ -31,14 +31,14 @@ export class ColumnFilterComponent {
   readonly filterCleared = output<string>();
 
   readonly toggleButton = viewChild<ElementRef<HTMLElement>>('toggleButton');
-  readonly filterMenu   = viewChild<ElementRef<HTMLElement>>('filterMenu');
+  readonly filterMenu = viewChild<ElementRef<HTMLElement>>('filterMenu');
 
   readonly FilterType = FilterType;
 
-  readonly isMenuOpen    = signal(false);
-  readonly searchTerm    = signal('');
+  readonly isMenuOpen = signal(false);
+  readonly searchTerm = signal('');
   readonly sortDirection = signal<'asc' | 'desc' | null>(null);
-  readonly popupStyle    = signal({ top: '0px', left: '0px' });
+  readonly popupStyle = signal({ top: '0px', left: '0px' });
 
   private readonly _pendingKeys = signal<ReadonlySet<number | string>>(new Set());
 
@@ -48,7 +48,7 @@ export class ColumnFilterComponent {
     const term = this.searchTerm().toLowerCase();
     const dir = this.sortDirection();
     let items = term
-      ? filter.children.filter(i => i.value.toLowerCase().includes(term))
+      ? filter.children.filter((i) => i.value.toLowerCase().includes(term))
       : [...filter.children];
     if (dir === 'asc') items = [...items].sort((a, b) => a.value.localeCompare(b.value));
     if (dir === 'desc') items = [...items].sort((a, b) => b.value.localeCompare(a.value));
@@ -62,7 +62,7 @@ export class ColumnFilterComponent {
     if (!this.isMenuOpen()) return;
     const el = target as Node | null;
     const clickedToggle = this.toggleButton()?.nativeElement?.contains(el);
-    const clickedMenu   = this.filterMenu()?.nativeElement?.contains(el);
+    const clickedMenu = this.filterMenu()?.nativeElement?.contains(el);
     if (!clickedToggle && !clickedMenu) {
       this.isMenuOpen.set(false);
     }
@@ -93,7 +93,7 @@ export class ColumnFilterComponent {
   }
 
   selectAll(): void {
-    this._pendingKeys.set(new Set(this.filter()?.children?.map(i => i.id)));
+    this._pendingKeys.set(new Set(this.filter()?.children?.map((i) => i.id)));
   }
 
   clearSelections(): void {

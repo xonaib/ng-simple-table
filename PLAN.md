@@ -3,6 +3,7 @@
 ## V1 — Complete ✅
 
 ### Shipped
+
 - [x] `SimpleTableComponent<T>` — standalone, generic, `OnPush`
 - [x] Declarative column config via `ColumnDef[]` array
 - [x] Sorting — `mat-sort-header` on all columns including custom-cell columns
@@ -26,6 +27,7 @@ Migrated `SimpleTableComponent`, `ColumnFilterComponent`, and `CellDefDirective`
 from decorator-based API to Angular 17+ signal primitives.
 
 ### SimpleTableComponent
+
 - [x] `@Input()` → `input()` / `input.required()`
 - [x] `@Output()` + `EventEmitter` → `output()`
 - [x] `@ContentChildren(CellDefDirective)` + `QueryList` → `contentChildren(CellDefDirective)`
@@ -35,6 +37,7 @@ from decorator-based API to Angular 17+ signal primitives.
 - [x] Remove `ChangeDetectorRef` entirely
 
 ### ColumnFilterComponent
+
 - [x] `@Input()` → `input()` / `input.required()`
 - [x] `@Output()` + `EventEmitter` → `output()`
 - [x] `@ViewChild` × 2 → `viewChild()`
@@ -46,9 +49,11 @@ from decorator-based API to Angular 17+ signal primitives.
 - [x] Template: `[(ngModel)]="searchTerm"` → `[ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)"`
 
 ### CellDefDirective
+
 - [x] `@Input('cellDef') columnDef` → `input.required<string>({ alias: 'cellDef' })`
 
 ### Demo page
+
 - No changes needed — already fully signal-based
 
 ---
@@ -56,6 +61,7 @@ from decorator-based API to Angular 17+ signal primitives.
 ## V2 — Planned
 
 ### Nested / Expandable Rows
+
 - `expandDef` content directive (mirrors `cellDef`) for the expansion panel template
 - `expand` built-in column (`columnDef: 'expand'`) — chevron toggle
 - Expanded row IDs tracked in `signal<Set<unknown>>()`
@@ -63,6 +69,7 @@ from decorator-based API to Angular 17+ signal primitives.
 - Recursive by default — host can nest `<simple-table>` inside the expansion template
 
 ### Inline Row Editing
+
 - `isEditable: boolean` added to `ColumnDef`
 - `editDef` content directive for custom edit-mode cell templates
 - Active edit row tracked in `signal<T | null>(null)`
@@ -71,13 +78,16 @@ from decorator-based API to Angular 17+ signal primitives.
 - Edit/confirm/cancel rendered in a dedicated actions column
 
 ### Drag & Drop Row Reordering
+
 - `reorderable` input (default `false`)
 - `cdkDropList` on `<tbody>`, `cdkDrag` on each `<tr mat-row>` (Angular CDK — no extra packages)
 - `drag` built-in column for the drag handle (`cdkDragHandle`)
 - `rowReorder` output emits `{ previousIndex, currentIndex, data: T[] }`
 
 ### Client-Side Data Mode
+
 When the host passes a plain `T[]` (not paged), the table should handle sort, filter, and pagination internally so the host doesn't need to wire up computed signals.
+
 - `clientSide: boolean` flag in `TableConfig` (default `false` to keep current behaviour)
 - When `true`, `SimpleTableComponent` owns a `MatTableDataSource<T>` internally — sort, filter, and paginator are connected automatically
 - Column filters drive `MatTableDataSource.filterPredicate` rather than emitting to the host
@@ -86,7 +96,9 @@ When the host passes a plain `T[]` (not paged), the table should handle sort, fi
 - Demo page gains a toggle to switch between client-side and server-side mode to showcase both
 
 ### Theming & Style Customisation
+
 Allow hosts to control the visual appearance without forking the component.
+
 - Expose a set of CSS custom properties (`--st-*`) for the most common overrides: row height, header background, header text colour, border colour, selected-row highlight, hover colour, scrollbar track/thumb colours
 - Wrap the table in a fixed-height container with `overflow-y: auto` when a `maxHeight` option is set in `TableConfig` — gives a scrollable body with a sticky header
 - `TableConfig.maxHeight?: string` (e.g. `'400px'`, `'60vh'`) controls the container; unset means no scroll constraint (current behaviour)
@@ -95,6 +107,7 @@ Allow hosts to control the visual appearance without forking the component.
 - Demo page gains a "Custom theme" panel that live-previews a few overrides
 
 ### Other V2
+
 - Date range column filter (`MatDatepicker`)
 - Column visibility toggle (`showColumnsToggle` in `TableConfig`)
 - Server-side sort/filter/page model (`serverSide: boolean` flag)

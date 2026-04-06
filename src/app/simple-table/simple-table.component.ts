@@ -22,12 +22,7 @@ import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
 import { Observable, isObservable, of as observableOf } from 'rxjs';
 import { ColumnFilterComponent } from './column-filter/column-filter.component';
 import { CellDefDirective } from './cell-def.directive';
-import {
-  ColumnFiltersData,
-  ColumnDef,
-  ItemParent,
-  TableConfig,
-} from './table.types';
+import { ColumnFiltersData, ColumnDef, ItemParent, TableConfig } from './table.types';
 
 @Component({
   selector: 'simple-table',
@@ -60,36 +55,42 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   // ---- inputs ----
 
-  readonly dataSource    = input.required<T[] | Observable<T[]>>();
-  readonly tableColumns  = input.required<ColumnDef[]>();
-  readonly tableConfig   = input<TableConfig>({});
-  readonly length        = input(0);
-  readonly columnFiltersData = input<ColumnFiltersData | Observable<ColumnFiltersData> | undefined>();
+  readonly dataSource = input.required<T[] | Observable<T[]>>();
+  readonly tableColumns = input.required<ColumnDef[]>();
+  readonly tableConfig = input<TableConfig>({});
+  readonly length = input(0);
+  readonly columnFiltersData = input<
+    ColumnFiltersData | Observable<ColumnFiltersData> | undefined
+  >();
   readonly stickyHeaders = input(false);
-  readonly selectedRows  = input<T[] | undefined>();
+  readonly selectedRows = input<T[] | undefined>();
 
   // ---- outputs ----
 
   /** emits Angular Material's PageEvent on pagination change */
-  readonly page            = output<PageEvent>();
+  readonly page = output<PageEvent>();
   /** emits full array of currently selected rows */
   readonly selectionChange = output<T[]>();
   /** emits the current filter map keyed by columnDef when Apply or Clear is clicked */
-  readonly filterChange    = output<Map<string, ItemParent>>();
+  readonly filterChange = output<Map<string, ItemParent>>();
   /** emits Angular Material's Sort object on column sort change */
-  readonly sortChange      = output<Sort>();
+  readonly sortChange = output<Sort>();
 
   // ---- internal state (template-accessible) ----
 
-  readonly _data    = signal<T[]>([]);
+  readonly _data = signal<T[]>([]);
   _headers: string[] = [];
   _dataColumns: ColumnDef[] = [];
   readonly columnFilters = signal<Map<string, ItemParent>>(new Map());
   readonly customCellTemplates = new Map<string, TemplateRef<{ $implicit: unknown }>>();
 
   constructor() {
-    effect(() => { this._switchDataSource(this.dataSource()); });
-    effect(() => { this._subscribeToFilters(this.columnFiltersData()); });
+    effect(() => {
+      this._switchDataSource(this.dataSource());
+    });
+    effect(() => {
+      this._subscribeToFilters(this.columnFiltersData());
+    });
     effect(() => {
       const rows = this.selectedRows();
       this.selection.clear();
@@ -108,9 +109,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   private _switchDataSource(value: T[] | Observable<T[]>): void {
     this._data.set([]);
-    const stream = isObservable(value)
-      ? value
-      : observableOf(value as T[]);
+    const stream = isObservable(value) ? value : observableOf(value as T[]);
 
     stream.pipe(takeUntilDestroyed(this._destroyRef)).subscribe((data: T[]) => {
       this._data.set(data ?? []);
@@ -119,15 +118,15 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   // ---- filters ----
 
-  private _subscribeToFilters(source: ColumnFiltersData | Observable<ColumnFiltersData> | undefined): void {
+  private _subscribeToFilters(
+    source: ColumnFiltersData | Observable<ColumnFiltersData> | undefined,
+  ): void {
     if (!source) return;
-    const stream = isObservable(source)
-      ? source
-      : observableOf(source as ColumnFiltersData);
+    const stream = isObservable(source) ? source : observableOf(source as ColumnFiltersData);
 
     stream.pipe(takeUntilDestroyed(this._destroyRef)).subscribe((data: ColumnFiltersData) => {
       const map = new Map<string, ItemParent>();
-      data.parents.forEach(p => map.set(String(p.id), p));
+      data.parents.forEach((p) => map.set(String(p.id), p));
       this.columnFilters.set(map);
     });
   }
@@ -153,7 +152,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   private _populateColumns(): void {
     this.customCellTemplates.clear();
-    this.cellDefs().forEach(d => this.customCellTemplates.set(d.columnDef(), d.template));
+    this.cellDefs().forEach((d) => this.customCellTemplates.set(d.columnDef(), d.template));
 
     this._headers = [];
     this._dataColumns = [];

@@ -13,16 +13,16 @@ renders itself. You only drop down to a template when a cell needs custom markup
 
 ## Features
 
-| Feature | Notes |
-|---|---|
-| Declarative columns | Pass a `ColumnDef[]` array — no per-column template boilerplate |
-| Sorting | Full `MatSort` integration on every column including custom-cell columns |
-| Row selection | Multi-select checkboxes, master toggle, `selectedRows` input for programmatic pre-selection |
-| Dropdown column filters | Searchable checkbox list, select-all, asc/desc sort, active-state icon |
-| Pagination | `MatPaginator` with configurable page sizes |
-| Custom cell templates | `[cellDef]` directive for per-column cell override — header stays auto-generated so sorting works |
-| Array + Observable | `dataSource` and `columnFiltersData` accept `T[]` or `Observable<T[]>` |
-| OnPush throughout | `ChangeDetectionStrategy.OnPush` on every component |
+| Feature                 | Notes                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| Declarative columns     | Pass a `ColumnDef[]` array — no per-column template boilerplate                                   |
+| Sorting                 | Full `MatSort` integration on every column including custom-cell columns                          |
+| Row selection           | Multi-select checkboxes, master toggle, `selectedRows` input for programmatic pre-selection       |
+| Dropdown column filters | Searchable checkbox list, select-all, asc/desc sort, active-state icon                            |
+| Pagination              | `MatPaginator` with configurable page sizes                                                       |
+| Custom cell templates   | `[cellDef]` directive for per-column cell override — header stays auto-generated so sorting works |
+| Array + Observable      | `dataSource` and `columnFiltersData` accept `T[]` or `Observable<T[]>`                            |
+| OnPush throughout       | `ChangeDetectionStrategy.OnPush` on every component                                               |
 
 ## Setup
 
@@ -77,7 +77,6 @@ that column is still auto-generated, so sorting works on every column uniformly.
 
 ```html
 <simple-table [dataSource]="items" [tableColumns]="columns" ...>
-
   <ng-template cellDef="name" let-row>
     <a [routerLink]="['/items', row.id]">{{ row.name }}</a>
   </ng-template>
@@ -85,40 +84,39 @@ that column is still auto-generated, so sorting works on every column uniformly.
   <ng-template cellDef="status" let-row>
     <span [class]="'badge badge-' + row.status">{{ row.status }}</span>
   </ng-template>
-
 </simple-table>
 ```
 
 ## Column Definition (`ColumnDef`)
 
-| Property | Type | Description |
-|---|---|---|
-| `columnDef` | `string` | Key matching the data property. Use `'select'` for the checkbox column. |
-| `header` | `string` | Display label. Title-cased from `columnDef` if omitted. |
-| `isSortable` | `boolean` | Enables the sort arrow. |
-| `hasColumnFilters` | `boolean` | Shows the filter icon and dropdown. |
-| `filterType` | `FilterType` | `FilterType.DropDown` — checkbox list with search. |
+| Property           | Type         | Description                                                             |
+| ------------------ | ------------ | ----------------------------------------------------------------------- |
+| `columnDef`        | `string`     | Key matching the data property. Use `'select'` for the checkbox column. |
+| `header`           | `string`     | Display label. Title-cased from `columnDef` if omitted.                 |
+| `isSortable`       | `boolean`    | Enables the sort arrow.                                                 |
+| `hasColumnFilters` | `boolean`    | Shows the filter icon and dropdown.                                     |
+| `filterType`       | `FilterType` | `FilterType.DropDown` — checkbox list with search.                      |
 
 ## Inputs
 
-| Input | Type | Default | Description |
-|---|---|---|---|
-| `dataSource` | `T[] \| Observable<T[]>` | — | Row data. Required. |
-| `tableColumns` | `ColumnDef[]` | — | Column definitions. Required. |
-| `tableConfig` | `TableConfig` | `{}` | Pagination settings. |
-| `length` | `number` | `0` | Total row count for the paginator (unsliced). |
-| `columnFiltersData` | `ColumnFiltersData \| Observable<ColumnFiltersData>` | — | Filter option lists. |
-| `selectedRows` | `T[]` | — | Pre-select rows programmatically. |
-| `stickyHeaders` | `boolean` | `false` | Sticky header row. |
+| Input               | Type                                                 | Default | Description                                   |
+| ------------------- | ---------------------------------------------------- | ------- | --------------------------------------------- |
+| `dataSource`        | `T[] \| Observable<T[]>`                             | —       | Row data. Required.                           |
+| `tableColumns`      | `ColumnDef[]`                                        | —       | Column definitions. Required.                 |
+| `tableConfig`       | `TableConfig`                                        | `{}`    | Pagination settings.                          |
+| `length`            | `number`                                             | `0`     | Total row count for the paginator (unsliced). |
+| `columnFiltersData` | `ColumnFiltersData \| Observable<ColumnFiltersData>` | —       | Filter option lists.                          |
+| `selectedRows`      | `T[]`                                                | —       | Pre-select rows programmatically.             |
+| `stickyHeaders`     | `boolean`                                            | `false` | Sticky header row.                            |
 
 ## Outputs
 
-| Output | Payload | Description |
-|---|---|---|
-| `page` | `PageEvent` | Fired on page or page-size change. |
-| `sortChange` | `Sort` | Fired on column sort. Active column and direction. |
-| `filterChange` | `Map<string, ItemParent>` | Fired on Apply or Clear. Keyed by `columnDef`. |
-| `selectionChange` | `T[]` | Full selected row array on every change. |
+| Output            | Payload                   | Description                                        |
+| ----------------- | ------------------------- | -------------------------------------------------- |
+| `page`            | `PageEvent`               | Fired on page or page-size change.                 |
+| `sortChange`      | `Sort`                    | Fired on column sort. Active column and direction. |
+| `filterChange`    | `Map<string, ItemParent>` | Fired on Apply or Clear. Keyed by `columnDef`.     |
+| `selectionChange` | `T[]`                     | Full selected row array on every change.           |
 
 ## Column Filters
 
@@ -130,9 +128,9 @@ filtersData: ColumnFiltersData = {
     {
       id: 'status',
       children: [
-        { id: 'todo',        value: 'Todo' },
+        { id: 'todo', value: 'Todo' },
         { id: 'in-progress', value: 'In Progress' },
-        { id: 'done',        value: 'Done' },
+        { id: 'done', value: 'Done' },
       ],
     },
   ],
@@ -167,12 +165,14 @@ multi-select, pagination, and a custom cell template on the Title column.
 ## Roadmap
 
 **V2**
+
 - Date range filter
 - Column visibility toggle
 - `selectedRows` input for server-driven selection
 - Server-side sort/query model
 
 **V3**
+
 - Virtual scrolling
 - Inline row editing
 - `ng-packagr` library build for npm publish
@@ -183,6 +183,7 @@ multi-select, pagination, and a custom cell template on the Title column.
 MIT
 
 ## References
+
 https://www.npmjs.com/package/dynamic-mat-table
 https://github.com/relair/material-dynamic-table
 https://github.com/arditsinani/mat-dynamic-table

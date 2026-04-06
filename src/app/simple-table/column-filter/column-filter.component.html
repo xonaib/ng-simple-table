@@ -12,15 +12,23 @@
 </button>
 
 @if (isMenuOpen()) {
-  <div class="filter-popup" #filterMenu role="dialog" [attr.aria-label]="'Filter options for ' + (column().header ?? column().columnDef)" [style.top]="popupStyle().top" [style.left]="popupStyle().left">
-
+  <div
+    class="filter-popup"
+    #filterMenu
+    role="dialog"
+    [attr.aria-label]="'Filter options for ' + (column().header ?? column().columnDef)"
+    [style.top]="popupStyle().top"
+    [style.left]="popupStyle().left"
+  >
     <div class="filter-header">
       <span>Filter: {{ column().header ?? column().columnDef }}</span>
     </div>
 
     @if (column().filterType === FilterType.DropDown) {
       <div class="filter-sort-select">
-        <button mat-button type="button" class="select-all-btn" (click)="selectAll()">Select All</button>
+        <button mat-button type="button" class="select-all-btn" (click)="selectAll()">
+          Select All
+        </button>
         <div class="sort-buttons">
           <button
             mat-icon-button
@@ -46,7 +54,13 @@
       <div class="filter-search-container">
         <div class="filter-search-bar">
           <mat-icon class="search-icon">search</mat-icon>
-          <input type="text" placeholder="Search" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" aria-label="Search filter options" />
+          <input
+            type="text"
+            placeholder="Search"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="searchTerm.set($event)"
+            aria-label="Search filter options"
+          />
         </div>
       </div>
 
@@ -54,13 +68,11 @@
         <ul class="filter-list">
           @for (item of filteredItems(); track item.id) {
             <li>
-              <mat-checkbox
-                [checked]="isSelected(item.id)"
-                (change)="toggleItem(item.id)"
-              >{{ item.value }}</mat-checkbox>
+              <mat-checkbox [checked]="isSelected(item.id)" (change)="toggleItem(item.id)">{{
+                item.value
+              }}</mat-checkbox>
             </li>
-          }
-          @empty {
+          } @empty {
             <li class="no-results">No options found</li>
           }
         </ul>
