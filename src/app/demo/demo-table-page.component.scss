@@ -20,6 +20,21 @@
   margin: 0;
 }
 
+.demo-github {
+  margin: 10px 0 0;
+}
+
+.demo-github-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .demo-controls {
   display: flex;
   align-items: center;

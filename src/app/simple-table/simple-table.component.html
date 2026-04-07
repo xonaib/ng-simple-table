@@ -52,6 +52,7 @@
 <table
   class="simple-table"
   [class.resizable]="_isResizable()"
+  [class.st-table-fixed-layout]="_tableLayoutFixed()"
   mat-table
   [dataSource]="tableConfig().clientSide ? _matDs : _data()"
   matSort
@@ -60,7 +61,7 @@
 >
   <!-- checkbox column — always locked, not draggable or resizable -->
   <ng-container matColumnDef="select">
-    <th mat-header-cell *matHeaderCellDef>
+    <th mat-header-cell *matHeaderCellDef [style.width]="effectiveWidthStyleForSelect()">
       <mat-checkbox
         (change)="$event ? masterToggle() : null"
         [checked]="selection.hasValue() && isAllSelected()"
@@ -69,7 +70,7 @@
       >
       </mat-checkbox>
     </th>
-    <td mat-cell *matCellDef="let row">
+    <td mat-cell *matCellDef="let row" [style.width]="effectiveWidthStyleForSelect()">
       <mat-checkbox
         (click)="$event.stopPropagation()"
         (change)="$event ? selection.toggle(row) : null"
@@ -97,7 +98,8 @@
       (cdkDropListDropped)="onColumnDrop($event)"
       [class.filter-col]="column.hasColumnFilters"
       [class.draggable]="_isDraggable()"
-      [style.width.px]="_columnWidths().get(column.columnDef) || null"
+      [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
+      [style.width]="effectiveWidthStyleForDataColumn(column)"
     >
       <div
         class="st-header-drag-root"
@@ -124,7 +126,7 @@
 
         <span
           mat-sort-header
-          [disabled]="!column.isSortable"
+          [disabled]="!isColumnSortable(column)"
           class="st-header-sort-label"
         >
           {{ column.header ?? column.columnDef | titlecase }}
@@ -151,7 +153,12 @@
         }
       </div>
     </th>
-    <td mat-cell *matCellDef="let row">
+    <td
+      mat-cell
+      *matCellDef="let row"
+      [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
+      [style.width]="effectiveWidthStyleForDataColumn(column)"
+    >
       @if (customCellTemplates.get(column.columnDef); as cellTmpl) {
         <ng-container
           [ngTemplateOutlet]="cellTmpl"
@@ -161,6 +168,12 @@
         {{ row[column.columnDef] }}
       }
     </td>
+  </ng-container>
+
+  <!-- Internal only: absorbs remaining width when pinned columns are narrower than the host. -->
+  <ng-container [matColumnDef]="layoutFillerColumnDef">
+    <th mat-header-cell *matHeaderCellDef class="st-layout-filler" aria-hidden="true"></th>
+    <td mat-cell *matCellDef="let row" class="st-layout-filler" aria-hidden="true"></td>
   </ng-container>
 
   <tr mat-header-row *matHeaderRowDef="_headers(); sticky: stickyHeaders()"></tr>

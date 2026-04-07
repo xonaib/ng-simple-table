@@ -34,13 +34,13 @@ export class DemoTablePageComponent {
 
   readonly columns: ColumnDef[] = [
     { columnDef: 'select' },
-    { columnDef: 'id',          header: 'ID',          isSortable: true },
-    { columnDef: 'title',       header: 'Title',       isSortable: true },
-    { columnDef: 'assignee',    header: 'Assignee',    isSortable: true,  hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'status',      header: 'Status',      isSortable: true,  hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'priority',    header: 'Priority',    isSortable: true,  hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'dueDate',     header: 'Due Date',    isSortable: true },
-    { columnDef: 'storyPoints', header: 'Points',      isSortable: true },
+    { columnDef: 'id',          header: 'ID',          width: 72 },
+    { columnDef: 'title',       header: 'Title',       width: 200 },
+    { columnDef: 'assignee',    header: 'Assignee',    hasColumnFilters: true, filterType: FilterType.DropDown },
+    { columnDef: 'status',      header: 'Status',      hasColumnFilters: true, filterType: FilterType.DropDown },
+    { columnDef: 'priority',    header: 'Priority',    hasColumnFilters: true, filterType: FilterType.DropDown },
+    { columnDef: 'dueDate',     header: 'Due Date' },
+    { columnDef: 'storyPoints', header: 'Points' },
   ];
 
   // ---- mode toggle ----
