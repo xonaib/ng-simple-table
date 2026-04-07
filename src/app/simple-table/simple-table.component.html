@@ -29,10 +29,11 @@
   [dataSource]="tableConfig().clientSide ? _matDs : _data()"
   matSort
   (matSortChange)="onSortChange($event)"
+  cdkDropListGroup
 >
   <!-- checkbox column — always locked, not draggable or resizable -->
   <ng-container matColumnDef="select">
-    <th mat-header-cell *matHeaderCellDef style="width: 40px">
+    <th mat-header-cell *matHeaderCellDef>
       <mat-checkbox
         (change)="$event ? masterToggle() : null"
         [checked]="selection.hasValue() && isAllSelected()"
@@ -53,42 +54,75 @@
   </ng-container>
 
   <!-- all data columns: always declare every matColumnDef so Material can restore hidden ones.
-       *ngFor (not @for) is intentional — CDK's cdkDropListGroup uses ContentChildren to connect
-       sibling drop lists, and Angular's new @for block creates views that ContentChildren cannot
-       traverse. *ngFor uses the traditional ViewContainerRef mechanism that CDK can query. -->
+       *ngFor (not @for) is intentional — CDK + mat-table header cells.
+       cdkDropList must live on <th> while cdkDrag wraps the cell contents: putting both on the
+       same element makes previousContainer === container on every drop, so _columnOrder never
+       updates and body columns stay out of sync with the header. -->
   <ng-container *ngFor="let column of _allDataColumns()" [matColumnDef]="column.columnDef">
     <th
       mat-header-cell
       *matHeaderCellDef
-      mat-sort-header
-      [attr.data-col-key]="column.columnDef"
-      [disabled]="!column.isSortable"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      cdkDropListSortingDisabled
+      [cdkDropListData]="column.columnDef"
+      [cdkDropListDisabled]="!_isDraggable()"
+      (cdkDropListDropped)="onColumnDrop($event)"
       [class.filter-col]="column.hasColumnFilters"
-      [class.col-dragging]="_draggingColKey() === column.columnDef"
-      [class.drag-over]="_dragOverColKey() === column.columnDef"
       [class.draggable]="_isDraggable()"
       [style.width.px]="_columnWidths().get(column.columnDef) || null"
-      (mousedown)="onColHeaderMouseDown($event, column.columnDef)"
     >
-      {{ column.header ?? column.columnDef | titlecase }}
+      <div
+        class="st-header-drag-root"
+        cdkDrag
+        [cdkDragData]="column.columnDef"
+        [cdkDragDisabled]="!_isDraggable()"
+        cdkDragLockAxis="x"
+      >
+        <!-- Custom preview: default clone is portaled to <body> and loses emulated-encapsulation
+             styles, so it looks like a tiny unstyled chip. matchSize keeps the real header bounds. -->
+        <ng-template cdkDragPreview matchSize>
+          <div class="st-cdk-column-header-preview">
+            {{ column.header ?? column.columnDef | titlecase }}
+          </div>
+        </ng-template>
 
-      @if (column.hasColumnFilters) {
-        <column-filter
-          [filter]="columnFilters().get(column.columnDef)"
-          [column]="column"
-          (filterApplied)="onFilterApplied(column.columnDef, $event)"
-          (filterCleared)="onFilterCleared($event)"
-          (click)="$event.stopPropagation()"
-        >
-        </column-filter>
-      }
+        <!-- Custom placeholder: clone loses encapsulation styles and looks empty; in-table
+             horizontal sorting also applies translate3d to siblings, which breaks <th> layout. -->
+        <ng-template cdkDragPlaceholder>
+          <div class="st-cdk-column-header-placeholder" aria-hidden="true">
+            {{ column.header ?? column.columnDef | titlecase }}
+          </div>
+        </ng-template>
 
-      @if (_isResizable()) {
         <span
-          class="resize-handle"
-          (mousedown)="onResizeStart($event, column.columnDef)"
-        ></span>
-      }
+          mat-sort-header
+          [disabled]="!column.isSortable"
+          class="st-header-sort-label"
+        >
+          {{ column.header ?? column.columnDef | titlecase }}
+        </span>
+
+        @if (column.hasColumnFilters) {
+          <column-filter
+            [filter]="columnFilters().get(column.columnDef)"
+            [column]="column"
+            (filterApplied)="onFilterApplied(column.columnDef, $event)"
+            (filterCleared)="onFilterCleared($event)"
+            (click)="$event.stopPropagation()"
+            (pointerdown)="$event.stopPropagation()"
+          >
+          </column-filter>
+        }
+
+        @if (_isResizable()) {
+          <span
+            class="resize-handle"
+            (pointerdown)="$event.stopPropagation()"
+            (mousedown)="onResizeStart($event, column.columnDef)"
+          ></span>
+        }
+      </div>
     </th>
     <td mat-cell *matCellDef="let row">
       @if (customCellTemplates.get(column.columnDef); as cellTmpl) {

@@ -47,3 +47,53 @@ body {
   letter-spacing: 0.05em;
   color: var(--mat-sys-on-surface-variant);
 }
+
+// CDK drag preview (portaled to <body> via ng-template cdkDragPreview — must be global)
+// Width/height come from CDK matchSize (inline px) — do not use % height/width here.
+.cdk-drag-preview.st-cdk-column-header-preview {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+  background-color: var(--mat-sys-surface-variant);
+  border-bottom: 2px solid var(--mat-sys-outline-variant);
+  border-radius: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow:
+    0 5px 5px -3px rgba(0 0 0 / 0.2),
+    0 8px 10px 1px rgba(0 0 0 / 0.14),
+    0 3px 14px 2px rgba(0 0 0 / 0.12);
+}
+
+// CDK placeholder: out of flow so it does not grow the header row (th is position: relative).
+.cdk-drag-placeholder.st-cdk-column-header-placeholder {
+  box-sizing: border-box;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 2px dashed var(--mat-sys-primary);
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--mat-sys-primary) 12%, var(--mat-sys-surface-variant));
+  outline: 1px solid var(--mat-sys-outline-variant);
+  outline-offset: -1px;
+}

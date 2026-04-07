@@ -19,6 +19,13 @@
   width: 100%;
   border-collapse: collapse;
 
+  // Shared with td + absolute header overlays (cdk drag root / placeholder) so text lines up
+  // with body cells: absolute children use the <th> padding *box* as CB, so inset:0 sits left of
+  // the real content box by padding-left — mirror that inset here.
+  --st-cell-pad-y: 10px;
+  --st-cell-pad-x: 12px;
+  --st-header-filter-pad-right: 32px;
+
   // table-layout: fixed is required for <th> width to govern the full column
   &.resizable {
     table-layout: fixed;
@@ -29,30 +36,26 @@
   th.mat-mdc-header-cell {
     background-color: var(--mat-sys-surface-variant);
     border-bottom: 2px solid var(--mat-sys-outline-variant);
-    padding: 10px 12px;
+    padding: var(--st-cell-pad-y) var(--st-cell-pad-x);
     position: relative;
     white-space: nowrap;
     overflow: hidden;
+    // Stable row height + positioning context: cdkDrag measures .st-header-drag-root; without
+    // this, % heights inside table cells collapse and the drag preview matchSize is too short.
+    min-height: 48px;
+    vertical-align: middle;
 
     &.filter-col {
-      padding-right: 32px;
+      padding-right: var(--st-header-filter-pad-right);
     }
 
-    // draggable cursor (when column drag-reorder is enabled)
-    &.draggable {
+    // draggable cursor (cdkDrag lives on .st-header-drag-root inside the cell)
+    &.draggable .st-header-drag-root {
       cursor: grab;
     }
 
-    // source column while dragging
-    &.col-dragging {
-      opacity: 0.5;
-    }
-
-    // drop-target highlight
-    &.drag-over {
-      background-color: var(--mat-sys-secondary-container);
-      outline: 2px dashed var(--mat-sys-primary);
-      outline-offset: -2px;
+    .st-header-drag-root.cdk-drag-animating {
+      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
     }
 
     // show filter icon on hover
@@ -60,6 +63,40 @@
     &.filter-applied column-filter .filter-toggle {
       opacity: 1;
     }
+  }
+
+  // Inset by the same padding as the <th> so content aligns with td.mat-mdc-cell (CB is padding box).
+  .st-header-drag-root {
+    position: absolute;
+    top: var(--st-cell-pad-y);
+    bottom: var(--st-cell-pad-y);
+    left: var(--st-cell-pad-x);
+    right: var(--st-cell-pad-x);
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  th.mat-mdc-header-cell.filter-col .st-header-drag-root {
+    right: var(--st-header-filter-pad-right);
+  }
+
+  // Placeholder is portaled into the cell by CDK; same inset as drag root.
+  th.mat-mdc-header-cell > .cdk-drag-placeholder.st-cdk-column-header-placeholder {
+    inset: auto;
+    top: var(--st-cell-pad-y);
+    bottom: var(--st-cell-pad-y);
+    left: var(--st-cell-pad-x);
+    right: var(--st-cell-pad-x);
+  }
+
+  th.mat-mdc-header-cell.filter-col > .cdk-drag-placeholder.st-cdk-column-header-placeholder {
+    right: var(--st-header-filter-pad-right);
+  }
+
+  .st-header-sort-label {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   // ---- resize handle ----
@@ -101,7 +138,7 @@
     font-size: 14px;
     color: var(--mat-sys-on-surface);
     border-bottom: 1px solid var(--mat-sys-outline-variant);
-    padding: 10px 12px;
+    padding: var(--st-cell-pad-y) var(--st-cell-pad-x);
   }
 
   // ---- rows ----
@@ -120,10 +157,18 @@
   }
 
   // ---- checkbox column ----
+  // MDC checkbox needs ~40px touch target; 40px col + default pad left 12px clipped the control.
+  // Header cells use overflow:hidden for drag headers — allow visible overflow here only.
 
-  .mat-column-select {
-    width: 40px;
-    padding-right: 0;
+  th.mat-mdc-header-cell.mat-column-select,
+  td.mat-mdc-cell.mat-column-select {
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    padding: var(--st-cell-pad-y) 10px;
+    overflow: visible;
+    text-align: center;
+    vertical-align: middle;
   }
 }
 

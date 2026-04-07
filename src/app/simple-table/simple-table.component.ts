@@ -23,6 +23,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
+import {
+  CdkDragDrop,
+  CdkDrag,
+  CdkDragPlaceholder,
+  CdkDragPreview,
+  CdkDropList,
+  CdkDropListGroup,
+  moveItemInArray,
+} from '@angular/cdk/drag-drop';
 import { Observable, isObservable, of as observableOf } from 'rxjs';
 import { ColumnFilterComponent } from './column-filter/column-filter.component';
 import { CellDefDirective } from './cell-def.directive';
@@ -42,6 +51,11 @@ import { ColumnFiltersData, ColumnDef, ItemParent, TableConfig } from './table.t
     MatIconModule,
     MatButtonModule,
     MatMenuModule,
+    CdkDrag,
+    CdkDragPlaceholder,
+    CdkDragPreview,
+    CdkDropList,
+    CdkDropListGroup,
     ColumnFilterComponent,
   ],
   templateUrl: './simple-table.component.html',
@@ -141,16 +155,6 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   readonly _isDraggable = computed(() => this.tableConfig().columnDraggable !== false);
   readonly _isResizable = computed(() => this.tableConfig().columnResizable  !== false);
-
-  // ---- drag-reorder state (mouse-event based) ----
-  // CDK cdkDropListGroup cannot connect drop lists inside Angular Material's *matHeaderCellDef
-  // embedded views (ContentChildren doesn't cross that boundary in Angular 17+). Pure mouse
-  // events work on any DOM element regardless of Angular view tree structure.
-
-  /** Key of the column currently being dragged; null when idle. Template uses this for styling. */
-  readonly _draggingColKey = signal<string | null>(null);
-  /** Key of the column the cursor is currently hovering over during a drag. */
-  readonly _dragOverColKey = signal<string | null>(null);
 
   // ---- column width state ----
 
@@ -298,67 +302,21 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     this._hiddenColumns.set(hidden);
   }
 
-  // ---- drag-reorder (pure mouse events) ----
+  // ---- drag-reorder (CDK drag-drop) ----
 
-  onColHeaderMouseDown(event: MouseEvent, colKey: string): void {
-    if (!this._isDraggable()) return;
-    event.preventDefault(); // prevent text selection on drag
+  onColumnDrop(event: CdkDragDrop<string>): void {
+    const fromKey = String(event.item.data);
+    const toKey   = String(event.container.data);
+    if (!fromKey || !toKey || fromKey === toKey) return;
 
-    const THRESHOLD = 5; // px to move before drag is considered intentional
-    const startX = event.clientX;
-    const startY = event.clientY;
-    let dragging = false;
+    const order = [...this._columnOrder()];
+    const fi    = order.indexOf(fromKey);
+    const ti    = order.indexOf(toKey);
+    if (fi < 0 || ti < 0) return;
 
-    const onMove = (e: MouseEvent): void => {
-      if (!dragging) {
-        if (Math.abs(e.clientX - startX) > THRESHOLD || Math.abs(e.clientY - startY) > THRESHOLD) {
-          dragging = true;
-          this._draggingColKey.set(colKey);
-          document.body.style.cursor = 'grabbing';
-          document.body.style.userSelect = 'none';
-        }
-        return;
-      }
-      // Determine which column header the cursor is over
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const th = el?.closest('[data-col-key]') as HTMLElement | null;
-      const over = th ? (th.dataset['colKey'] ?? null) : null;
-      this._dragOverColKey.set(over && over !== colKey ? over : null);
-    };
-
-    const onUp = (e: MouseEvent): void => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-
-      if (!dragging) return;
-
-      // Block the click event that fires after mouseup so mat-sort-header doesn't trigger
-      document.addEventListener(
-        'click',
-        (ev) => { ev.stopPropagation(); ev.preventDefault(); },
-        { capture: true, once: true },
-      );
-
-      const to = this._dragOverColKey();
-      this._draggingColKey.set(null);
-      this._dragOverColKey.set(null);
-
-      if (to && colKey !== to) {
-        const order = [...this._columnOrder()];
-        const fi = order.indexOf(colKey);
-        const ti = order.indexOf(to);
-        if (fi >= 0 && ti >= 0) {
-          order.splice(ti, 0, order.splice(fi, 1)[0]);
-          this._columnOrder.set(order);
-          this.columnOrderChange.emit([...order]);
-        }
-      }
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    moveItemInArray(order, fi, ti);
+    this._columnOrder.set(order);
+    this.columnOrderChange.emit([...order]);
   }
 
   // ---- column resize ----
