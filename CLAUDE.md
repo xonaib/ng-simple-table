@@ -35,6 +35,7 @@ The core component (`src/app/simple-table/`). Key design decisions:
 - **Column filter state**: `columnFilters` is a `signal<Map<string, ItemParent>>`. `ColumnFilterComponent` holds its own pending selection state (`_pendingKeys` signal) — changes are only committed to the parent on Apply/Clear.
 - **Dual data source**: in server-side mode (default) data flows through `_data` signal directly into `mat-table`. In client-side mode (`TableConfig.clientSide: true`) a `MatTableDataSource<T>` (`_matDs`) is owned internally and connected to `MatSort`/`MatPaginator` via a signal `effect()` — this fires on init and whenever `clientSide` is toggled at runtime. Master toggle and `isAllSelected()` use `_visibleRows()` which returns the current page slice from `_matDs` in client-side mode and `_data()` in server-side mode.
 - **`pageIndex` input**: in server-side mode the host passes the current page index so the paginator visually resets when sort/filter handlers call `_pageIndex.set(0)`.
+- **Column drag-reorder**: uses CDK `CdkDrag`/`CdkDropList`/`CdkDropListGroup` on the header cells. Each `<th>` is simultaneously a `CdkDropList` and a `CdkDrag`; the `<table>` carries `cdkDropListGroup` to auto-connect them. `*ngFor` (not `@for`) is required so CDK can traverse the view tree. Filter and resize-handle elements stop `pointerdown` propagation to avoid triggering a drag.
 
 ### DemoTablePageComponent
 

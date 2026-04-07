@@ -3,12 +3,21 @@ export interface ColumnDef {
   columnDef: string;
   /** display label — title-cased from columnDef if omitted */
   header?: string;
-  isSortable?: boolean;
+  /**
+   * Column width: number is treated as px; string is any valid CSS width (e.g. `'12rem'`, `'20%'`).
+   * Omitted = auto. User resize overrides are applied on top at runtime.
+   */
+  width?: number | string;
+  /** When false, disables sort for this column. Omitted = sortable (except `select`, never sortable). */
+  sortable?: boolean;
   hasColumnFilters?: boolean;
   filterType?: FilterType;
   /** reserved for future column reordering (v2) */
   displayIndex?: number;
 }
+
+/** Reserved `columnDef` used internally for the layout filler column — do not use in host configs. */
+export const SIMPLE_TABLE_LAYOUT_FILLER_COLUMN = 'st-layout-filler' as const;
 
 export interface TableConfig {
   isPaginated?: boolean;
@@ -20,6 +29,14 @@ export interface TableConfig {
    * wiring up page/sort/filter event handlers.
    */
   clientSide?: boolean;
+  /** Set false to hide the column chooser toolbar button. Default: on. */
+  showColumnChooser?: boolean;
+  /** Set false to hide the refresh toolbar button. Default: on. */
+  showRefresh?: boolean;
+  /** Set false to disable column drag-reorder. Default: on. */
+  columnDraggable?: boolean;
+  /** Set false to disable column width resize handles. Default: on. */
+  columnResizable?: boolean;
 }
 
 export interface PaginationOptions {

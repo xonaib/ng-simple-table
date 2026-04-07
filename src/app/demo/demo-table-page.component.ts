@@ -34,13 +34,13 @@ export class DemoTablePageComponent {
 
   readonly columns: ColumnDef[] = [
     { columnDef: 'select' },
-    { columnDef: 'id',          header: 'ID',          isSortable: true },
-    { columnDef: 'title',       header: 'Title',       isSortable: true },
-    { columnDef: 'assignee',    header: 'Assignee',    isSortable: true,  hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'status',      header: 'Status',      isSortable: true,  hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'priority',    header: 'Priority',    isSortable: true,  hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'dueDate',     header: 'Due Date',    isSortable: true },
-    { columnDef: 'storyPoints', header: 'Points',      isSortable: true },
+    { columnDef: 'id',          header: 'ID',          width: 72 },
+    { columnDef: 'title',       header: 'Title',       width: 200 },
+    { columnDef: 'assignee',    header: 'Assignee',    hasColumnFilters: true, filterType: FilterType.DropDown },
+    { columnDef: 'status',      header: 'Status',      hasColumnFilters: true, filterType: FilterType.DropDown },
+    { columnDef: 'priority',    header: 'Priority',    hasColumnFilters: true, filterType: FilterType.DropDown },
+    { columnDef: 'dueDate',     header: 'Due Date' },
+    { columnDef: 'storyPoints', header: 'Points' },
   ];
 
   // ---- mode toggle ----
@@ -59,10 +59,11 @@ export class DemoTablePageComponent {
 
   // ---- server-side state signals ----
 
-  private readonly _activeFilters = signal<Map<string, ItemParent>>(new Map());
-  private readonly _sortState     = signal<Sort | null>(null);
-  readonly _pageIndex             = signal(0);   // non-private: passed to simple-table [pageIndex]
-  private readonly _pageSize      = signal(10);
+  private readonly _activeFilters  = signal<Map<string, ItemParent>>(new Map());
+  private readonly _sortState      = signal<Sort | null>(null);
+  readonly _pageIndex              = signal(0);   // non-private: passed to simple-table [pageIndex]
+  private readonly _pageSize       = signal(10);
+  private readonly _refreshCounter = signal(0);
 
   // ---- HTTP params (server-side mode) ----
 
@@ -84,9 +85,11 @@ export class DemoTablePageComponent {
   });
 
   // Combined trigger so switching modes also fires a new request.
+  // _refreshCounter is included so incrementing it forces a new HTTP request.
   private readonly _queryTrigger = computed(() => ({
     clientSide: this.isClientSide(),
     params:     this._serverSideParams(),
+    refresh:    this._refreshCounter(),
   }));
 
   // ---- loading + HTTP response ----
@@ -144,6 +147,19 @@ export class DemoTablePageComponent {
 
   onSelectionChange(rows: Task[]): void {
     this.selectedTasks.set(rows);
+  }
+
+  onRefresh(): void {
+    this._pageIndex.set(0);
+    this._refreshCounter.update(n => n + 1);
+  }
+
+  onColumnOrderChange(order: string[]): void {
+    console.log('[demo] column order:', order);
+  }
+
+  onColumnWidthChange(widths: Record<string, number>): void {
+    console.log('[demo] column widths:', widths);
   }
 
   // ---- helpers ----

@@ -1,28 +1,36 @@
 # simple-table
 
-A reusable, declarative Angular Material data table built with Angular 21.
-Configure columns with a JSON array, get sorting, multi-select, dropdown filters,
-and pagination out of the box — with an escape hatch for custom cell templates.
-Zero third-party dependencies beyond Angular Material.
+A reusable, declarative Angular Material data table built with Angular 21. Configure columns with a JSON array, get sorting, multi-select, dropdown filters, and pagination out of the box — with an escape hatch for custom cell templates. Zero third-party dependencies beyond Angular Material.
+
+| | |
+| --- | --- |
+| **Live demo** | [ng-simple-table.vercel.app](https://ng-simple-table.vercel.app/) |
+| **Source** | [github.com/xonaib/ng-simple-table](https://github.com/xonaib/ng-simple-table) |
 
 ## Why
 
-Most Angular Material table examples require you to write `<ng-container matColumnDef>` blocks
-for every column. This component flips that: you describe your columns as data, and the table
-renders itself. You only drop down to a template when a cell needs custom markup.
+Most Angular Material table examples require you to write `<ng-container matColumnDef>` blocks for every column. This component flips that: you describe your columns as data, and the table renders itself. You only drop down to a template when a cell needs custom markup.
 
 ## Features
 
-| Feature                 | Notes                                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------- |
-| Declarative columns     | Pass a `ColumnDef[]` array — no per-column template boilerplate                                   |
-| Sorting                 | Full `MatSort` integration on every column including custom-cell columns                          |
-| Row selection           | Multi-select checkboxes, master toggle, `selectedRows` input for programmatic pre-selection       |
-| Dropdown column filters | Searchable checkbox list, select-all, asc/desc sort, active-state icon                            |
-| Pagination              | `MatPaginator` with configurable page sizes                                                       |
-| Custom cell templates   | `[cellDef]` directive for per-column cell override — header stays auto-generated so sorting works |
-| Array + Observable      | `dataSource` and `columnFiltersData` accept `T[]` or `Observable<T[]>`                            |
-| OnPush throughout       | `ChangeDetectionStrategy.OnPush` on every component                                               |
+| Feature | Notes |
+| --- | --- |
+| Declarative columns | Pass a `ColumnDef[]` array — no per-column template boilerplate |
+| Sorting | `MatSort` on data columns; **`sortable` defaults to true** — set `sortable: false` to opt out. The **`select` column is never sortable** |
+| Row selection | Multi-select checkboxes, master toggle, `selectedRows` input |
+| Dropdown column filters | Searchable checkbox list, select-all, asc/desc in panel, active-state icon |
+| Pagination | `MatPaginator` with configurable page sizes; server- and client-side modes in the demo |
+| Column widths | Optional `width` on `ColumnDef` (`number` = px, `string` = CSS length). Resize overrides at runtime; internal **filler column** when pinned widths are narrower than the host (not listed in the column chooser) |
+| Column reorder | CDK drag-drop on header cells and in the column-chooser menu |
+| Column chooser | Show/hide columns and reorder via toolbar menu |
+| Column resize | Drag handles; `(columnWidthChange)` emits `Record<string, number>` |
+| Custom cell templates | `[cellDef]` directive — header stays auto-generated so sorting works |
+| Array + Observable | `dataSource` and `columnFiltersData` accept `T[]` or `Observable<...>` |
+| OnPush | `ChangeDetectionStrategy.OnPush` on components |
+
+## Known gaps
+
+- **Cell text overflow:** With explicit or resized column widths and `table-layout: fixed`, body cells still use **`white-space: nowrap`** / **`overflow: hidden`** in places. Long text is clipped. A future improvement is to **opt into wrapping** (e.g. per-column or global flag) so content can wrap inside the allotted width instead of overflowing visually.
 
 ## Setup
 
@@ -33,7 +41,7 @@ ng add @angular/material
 # copy src/app/simple-table/ into your project
 ```
 
-## Quick Start
+## Quick start
 
 ```typescript
 // your-page.component.ts
@@ -42,9 +50,13 @@ import { ColumnDef, FilterType, TableConfig } from './simple-table/table.types';
 
 columns: ColumnDef[] = [
   { columnDef: 'select' },
-  { columnDef: 'name',   header: 'Name',   isSortable: true },
-  { columnDef: 'status', header: 'Status', isSortable: true,
-    hasColumnFilters: true, filterType: FilterType.DropDown },
+  { columnDef: 'name', header: 'Name' },
+  {
+    columnDef: 'status',
+    header: 'Status',
+    hasColumnFilters: true,
+    filterType: FilterType.DropDown,
+  },
 ];
 
 tableConfig: TableConfig = {
@@ -54,7 +66,6 @@ tableConfig: TableConfig = {
 ```
 
 ```html
-<!-- your-page.component.html -->
 <simple-table
   [dataSource]="pagedItems"
   [tableColumns]="columns"
@@ -69,11 +80,9 @@ tableConfig: TableConfig = {
 </simple-table>
 ```
 
-## Custom Cell Templates
+## Custom cell templates
 
-When a cell needs more than plain text — a link, a badge, a chip — provide an
-`<ng-template [cellDef]="columnDef">` inside `<simple-table>`. The header for
-that column is still auto-generated, so sorting works on every column uniformly.
+When a cell needs more than plain text — a link, a badge, a chip — provide an `<ng-template [cellDef]="columnDef">` inside `<simple-table>`. The header for that column is still auto-generated, so sorting works on every column uniformly.
 
 ```html
 <simple-table [dataSource]="items" [tableColumns]="columns" ...>
@@ -87,38 +96,45 @@ that column is still auto-generated, so sorting works on every column uniformly.
 </simple-table>
 ```
 
-## Column Definition (`ColumnDef`)
+## Column definition (`ColumnDef`)
 
-| Property           | Type         | Description                                                             |
-| ------------------ | ------------ | ----------------------------------------------------------------------- |
-| `columnDef`        | `string`     | Key matching the data property. Use `'select'` for the checkbox column. |
-| `header`           | `string`     | Display label. Title-cased from `columnDef` if omitted.                 |
-| `isSortable`       | `boolean`    | Enables the sort arrow.                                                 |
-| `hasColumnFilters` | `boolean`    | Shows the filter icon and dropdown.                                     |
-| `filterType`       | `FilterType` | `FilterType.DropDown` — checkbox list with search.                      |
+| Property | Type | Description |
+| --- | --- | --- |
+| `columnDef` | `string` | Key matching the data property. Use `'select'` for the checkbox column. |
+| `header` | `string` | Display label. Title-cased from `columnDef` if omitted. |
+| `width` | `number \| string` | Optional width (`number` = px; string = any CSS length). Omitted = auto. |
+| `sortable` | `boolean` | Set `false` to disable sorting. Omitted = sortable. `select` is never sortable. |
+| `hasColumnFilters` | `boolean` | Shows the filter icon and dropdown. |
+| `filterType` | `FilterType` | `FilterType.DropDown` — checkbox list with search. |
+
+Reserved: `st-layout-filler` is used internally for layout; do not use as a host `columnDef`.
 
 ## Inputs
 
-| Input               | Type                                                 | Default | Description                                   |
-| ------------------- | ---------------------------------------------------- | ------- | --------------------------------------------- |
-| `dataSource`        | `T[] \| Observable<T[]>`                             | —       | Row data. Required.                           |
-| `tableColumns`      | `ColumnDef[]`                                        | —       | Column definitions. Required.                 |
-| `tableConfig`       | `TableConfig`                                        | `{}`    | Pagination settings.                          |
-| `length`            | `number`                                             | `0`     | Total row count for the paginator (unsliced). |
-| `columnFiltersData` | `ColumnFiltersData \| Observable<ColumnFiltersData>` | —       | Filter option lists.                          |
-| `selectedRows`      | `T[]`                                                | —       | Pre-select rows programmatically.             |
-| `stickyHeaders`     | `boolean`                                            | `false` | Sticky header row.                            |
+| Input | Type | Default | Description |
+| --- | --- | --- | --- |
+| `dataSource` | `T[] \| Observable<T[]>` | — | Row data. Required. |
+| `tableColumns` | `ColumnDef[]` | — | Column definitions. Required. |
+| `tableConfig` | `TableConfig` | `{}` | Pagination, client-side mode, toolbar, drag/resize flags. |
+| `length` | `number` | `0` | Total row count for the paginator (server-side). |
+| `pageIndex` | `number` | — | Sync paginator when the host resets page (server-side). |
+| `columnFiltersData` | `ColumnFiltersData \| Observable<...>` | — | Filter option lists. |
+| `selectedRows` | `T[]` | — | Pre-select rows programmatically. |
+| `stickyHeaders` | `boolean` | `false` | Sticky header row. |
 
 ## Outputs
 
-| Output            | Payload                   | Description                                        |
-| ----------------- | ------------------------- | -------------------------------------------------- |
-| `page`            | `PageEvent`               | Fired on page or page-size change.                 |
-| `sortChange`      | `Sort`                    | Fired on column sort. Active column and direction. |
-| `filterChange`    | `Map<string, ItemParent>` | Fired on Apply or Clear. Keyed by `columnDef`.     |
-| `selectionChange` | `T[]`                     | Full selected row array on every change.           |
+| Output | Payload | Description |
+| --- | --- | --- |
+| `page` | `PageEvent` | Page or page-size change. |
+| `sortChange` | `Sort` | Column sort. |
+| `filterChange` | `Map<string, ItemParent>` | Apply or Clear. |
+| `selectionChange` | `T[]` | Selected rows. |
+| `refresh` | `void` | Refresh toolbar button. |
+| `columnOrderChange` | `string[]` | Data column keys after header drag-reorder. |
+| `columnWidthChange` | `Record<string, number>` | Column widths in px after resize. |
 
-## Column Filters
+## Column filters
 
 Build `ColumnFiltersData` by deriving unique values from your dataset:
 
@@ -137,39 +153,27 @@ filtersData: ColumnFiltersData = {
 };
 ```
 
-`filterChange` emits a `Map<string, ItemParent>`. Read `ItemParent.selectedKeys`
-to know which values are active, then filter your data array in the host component.
+`filterChange` emits a `Map<string, ItemParent>`. Read `ItemParent.selectedKeys` for active values.
 
 ## Pagination
 
-`(page)` emits Angular Material's `PageEvent`. For client-side pagination, slice your array
-and pass the unsliced total as `[length]`:
+`(page)` emits Angular Material’s `PageEvent`. For client-side pagination inside the table, set `tableConfig.clientSide: true` and pass the full dataset, or slice in the host and pass `[length]` for the total.
 
-```typescript
-onPage(event: PageEvent): void {
-  const start = event.pageIndex * event.pageSize;
-  this.pagedData = this.allData.slice(start, start + event.pageSize);
-}
-```
-
-## Run the Demo
+## Run the demo locally
 
 ```bash
 npm start
 ```
 
-Opens `http://localhost:4200` — a task management table with all features active:
-50 rows, 4 assignees, sorting on every column, dropdown filters on three columns,
-multi-select, pagination, and a custom cell template on the Title column.
+Opens `http://localhost:4200` — task table with server/client toggle, filters, selection, column chooser, reorder, resize, custom title cell, and demo `ColumnDef` widths.
 
 ## Roadmap
 
 **V2**
 
 - Date range filter
-- Column visibility toggle
-- `selectedRows` input for server-driven selection
-- Server-side sort/query model
+- Optional **text wrap** for fixed-width / narrow columns (see Known gaps)
+- Richer server-side query typing helpers
 
 **V3**
 
@@ -184,7 +188,9 @@ MIT
 
 ## References
 
-https://www.npmjs.com/package/dynamic-mat-table
-https://github.com/relair/material-dynamic-table
-https://github.com/arditsinani/mat-dynamic-table
-https://github.com/lukekroon/ngx-mat-dynamic-table
+Similar “dynamic Material table” ideas (for comparison, not dependencies):
+
+- [dynamic-mat-table (npm)](https://www.npmjs.com/package/dynamic-mat-table)
+- [relair/material-dynamic-table](https://github.com/relair/material-dynamic-table)
+- [arditsinani/mat-dynamic-table](https://github.com/arditsinani/mat-dynamic-table)
+- [lukekroon/ngx-mat-dynamic-table](https://github.com/lukekroon/ngx-mat-dynamic-table)
