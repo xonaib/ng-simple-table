@@ -1,6 +1,6 @@
 @if (_hasToolbar()) {
   <div class="st-toolbar">
-    @if (tableConfig().showColumnChooser) {
+    @if (_showColumnChooser()) {
       <button mat-icon-button [matMenuTriggerFor]="colMenu" aria-label="Choose columns">
         <mat-icon>view_week</mat-icon>
       </button>
@@ -14,7 +14,7 @@
         }
       </mat-menu>
     }
-    @if (tableConfig().showRefresh) {
+    @if (_showRefresh()) {
       <button mat-icon-button (click)="refresh.emit()" aria-label="Refresh data">
         <mat-icon>refresh</mat-icon>
       </button>
@@ -24,12 +24,13 @@
 
 <table
   class="simple-table"
+  [class.resizable]="_isResizable()"
   mat-table
   [dataSource]="tableConfig().clientSide ? _matDs : _data()"
   matSort
   (matSortChange)="onSortChange($event)"
 >
-  <!-- checkbox column -->
+  <!-- checkbox column — always locked, not draggable or resizable -->
   <ng-container matColumnDef="select">
     <th mat-header-cell *matHeaderCellDef style="width: 40px">
       <mat-checkbox
@@ -51,43 +52,55 @@
     </td>
   </ng-container>
 
-  <!-- all data columns: header always auto-generated (so mat-sort-header works);
-       cell uses a custom cellDef template when provided, otherwise renders the value directly.
-       All columns are declared here even if hidden so Material Table can restore them. -->
-  @for (column of _allDataColumns(); track column.columnDef) {
-    <ng-container [matColumnDef]="column.columnDef">
-      <th
-        mat-header-cell
-        *matHeaderCellDef
-        mat-sort-header
-        [disabled]="!column.isSortable"
-        [class.filter-col]="column.hasColumnFilters"
-      >
-        {{ column.header ?? column.columnDef | titlecase }}
+  <!-- all data columns: always declare every matColumnDef so Material can restore hidden ones.
+       *ngFor (not @for) is intentional — CDK's cdkDropListGroup uses ContentChildren to connect
+       sibling drop lists, and Angular's new @for block creates views that ContentChildren cannot
+       traverse. *ngFor uses the traditional ViewContainerRef mechanism that CDK can query. -->
+  <ng-container *ngFor="let column of _allDataColumns()" [matColumnDef]="column.columnDef">
+    <th
+      mat-header-cell
+      *matHeaderCellDef
+      mat-sort-header
+      [attr.data-col-key]="column.columnDef"
+      [disabled]="!column.isSortable"
+      [class.filter-col]="column.hasColumnFilters"
+      [class.col-dragging]="_draggingColKey() === column.columnDef"
+      [class.drag-over]="_dragOverColKey() === column.columnDef"
+      [class.draggable]="_isDraggable()"
+      [style.width.px]="_columnWidths().get(column.columnDef) || null"
+      (mousedown)="onColHeaderMouseDown($event, column.columnDef)"
+    >
+      {{ column.header ?? column.columnDef | titlecase }}
 
-        @if (column.hasColumnFilters) {
-          <column-filter
-            [filter]="columnFilters().get(column.columnDef)"
-            [column]="column"
-            (filterApplied)="onFilterApplied(column.columnDef, $event)"
-            (filterCleared)="onFilterCleared($event)"
-            (click)="$event.stopPropagation()"
-          >
-          </column-filter>
-        }
-      </th>
-      <td mat-cell *matCellDef="let row">
-        @if (customCellTemplates.get(column.columnDef); as cellTmpl) {
-          <ng-container
-            [ngTemplateOutlet]="cellTmpl"
-            [ngTemplateOutletContext]="{ $implicit: row }"
-          ></ng-container>
-        } @else {
-          {{ row[column.columnDef] }}
-        }
-      </td>
-    </ng-container>
-  }
+      @if (column.hasColumnFilters) {
+        <column-filter
+          [filter]="columnFilters().get(column.columnDef)"
+          [column]="column"
+          (filterApplied)="onFilterApplied(column.columnDef, $event)"
+          (filterCleared)="onFilterCleared($event)"
+          (click)="$event.stopPropagation()"
+        >
+        </column-filter>
+      }
+
+      @if (_isResizable()) {
+        <span
+          class="resize-handle"
+          (mousedown)="onResizeStart($event, column.columnDef)"
+        ></span>
+      }
+    </th>
+    <td mat-cell *matCellDef="let row">
+      @if (customCellTemplates.get(column.columnDef); as cellTmpl) {
+        <ng-container
+          [ngTemplateOutlet]="cellTmpl"
+          [ngTemplateOutletContext]="{ $implicit: row }"
+        ></ng-container>
+      } @else {
+        {{ row[column.columnDef] }}
+      }
+    </td>
+  </ng-container>
 
   <tr mat-header-row *matHeaderRowDef="_headers(); sticky: stickyHeaders()"></tr>
   <tr

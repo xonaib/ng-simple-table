@@ -20,10 +20,14 @@ export interface TableConfig {
    * wiring up page/sort/filter event handlers.
    */
   clientSide?: boolean;
-  /** Show a column chooser button in the toolbar to toggle column visibility. */
+  /** Set false to hide the column chooser toolbar button. Default: on. */
   showColumnChooser?: boolean;
-  /** Show a refresh button in the toolbar; emits the `refresh` output when clicked. */
+  /** Set false to hide the refresh toolbar button. Default: on. */
   showRefresh?: boolean;
+  /** Set false to disable column drag-reorder. Default: on. */
+  columnDraggable?: boolean;
+  /** Set false to disable column width resize handles. Default: on. */
+  columnResizable?: boolean;
 }
 
 export interface PaginationOptions {

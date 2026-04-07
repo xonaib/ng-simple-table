@@ -14,7 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NgTemplateOutlet, TitleCasePipe } from '@angular/common';
+import { NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -33,6 +33,7 @@ import { ColumnFiltersData, ColumnDef, ItemParent, TableConfig } from './table.t
   standalone: true,
   imports: [
     TitleCasePipe,
+    NgFor,
     NgTemplateOutlet,
     MatTableModule,
     MatSortModule,
@@ -54,7 +55,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly selection = new SelectionModel<T>(true, []);
 
   // ---- view children (used for client-side mode) ----
-  private readonly _sortRef = viewChild(MatSort);
+  private readonly _sortRef      = viewChild(MatSort);
   private readonly _paginatorRef = viewChild(MatPaginator);
 
   /** custom cell templates provided by the host via [cellDef] */
@@ -90,6 +91,10 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly sortChange = output<Sort>();
   /** emits when the refresh button is clicked; host is responsible for re-fetching data */
   readonly refresh = output<void>();
+  /** emits the new column key order (excluding 'select') after a drag-reorder */
+  readonly columnOrderChange = output<string[]>();
+  /** emits a map of columnDef → width in px after a resize interaction */
+  readonly columnWidthChange = output<Record<string, number>>();
 
   // ---- internal state (template-accessible) ----
 
@@ -97,7 +102,13 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly columnFilters = signal<Map<string, ItemParent>>(new Map());
   readonly customCellTemplates = new Map<string, TemplateRef<{ $implicit: unknown }>>();
 
-  /** All non-select columns — drives the matColumnDef block rendering (always all columns) */
+  /**
+   * All non-select columns in their original tableColumns order.
+   * Used only to register every matColumnDef with Material Table — order here is irrelevant.
+   * Display order is controlled exclusively by _headers() via *matHeaderRowDef / *matRowDef.
+   * Keeping this stable prevents unnecessary matColumnDef re-registration which would
+   * reset Material Table's internal state and break data-row updates when _headers() changes.
+   */
   readonly _allDataColumns = computed(() =>
     this.tableColumns().filter(col => col.columnDef !== 'select')
   );
@@ -105,17 +116,45 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   /** Column keys currently hidden by the column chooser */
   readonly _hiddenColumns = signal<Set<string>>(new Set());
 
-  /** Visible column keys (including select) — drives the table row layout */
-  readonly _headers = computed(() =>
-    this.tableColumns()
-      .map(col => col.columnDef)
-      .filter(key => !this._hiddenColumns().has(key))
-  );
+  /**
+   * User-controlled display order for data columns (excludes 'select').
+   * Initialised from tableColumns on ngAfterContentInit.
+   */
+  readonly _columnOrder = signal<string[]>([]);
 
-  /** True when at least one toolbar action is enabled */
-  readonly _hasToolbar = computed(() =>
-    !!(this.tableConfig().showColumnChooser || this.tableConfig().showRefresh)
-  );
+  /** Visible column keys in display order — drives *matHeaderRowDef / *matRowDef */
+  readonly _headers = computed(() => {
+    const order    = this._columnOrder();
+    const hidden   = this._hiddenColumns();
+    const hasSelect = this.tableColumns().some(c => c.columnDef === 'select');
+    const visible  = order.filter(key => !hidden.has(key));
+    return hasSelect ? ['select', ...visible] : visible;
+  });
+
+  // ---- toolbar visibility (opt-out: undefined = on, false = off) ----
+
+  readonly _showColumnChooser = computed(() => this.tableConfig().showColumnChooser !== false);
+  readonly _showRefresh       = computed(() => this.tableConfig().showRefresh       !== false);
+  readonly _hasToolbar        = computed(() => this._showColumnChooser() || this._showRefresh());
+
+  // ---- drag / resize feature flags (opt-out) ----
+
+  readonly _isDraggable = computed(() => this.tableConfig().columnDraggable !== false);
+  readonly _isResizable = computed(() => this.tableConfig().columnResizable  !== false);
+
+  // ---- drag-reorder state (mouse-event based) ----
+  // CDK cdkDropListGroup cannot connect drop lists inside Angular Material's *matHeaderCellDef
+  // embedded views (ContentChildren doesn't cross that boundary in Angular 17+). Pure mouse
+  // events work on any DOM element regardless of Angular view tree structure.
+
+  /** Key of the column currently being dragged; null when idle. Template uses this for styling. */
+  readonly _draggingColKey = signal<string | null>(null);
+  /** Key of the column the cursor is currently hovering over during a drag. */
+  readonly _dragOverColKey = signal<string | null>(null);
+
+  // ---- column width state ----
+
+  readonly _columnWidths = signal<Map<string, number>>(new Map());
 
   /** owned MatTableDataSource used when clientSide: true */
   readonly _matDs = new MatTableDataSource<T>();
@@ -181,6 +220,12 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   ngAfterContentInit(): void {
     this._populateColumns();
     this._subscribeToSelection();
+    // Initialise display order from the host-provided column list
+    this._columnOrder.set(
+      this.tableColumns()
+        .filter(col => col.columnDef !== 'select')
+        .map(col => col.columnDef),
+    );
   }
 
   // ---- data source ----
@@ -251,6 +296,96 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     const hidden = new Set(this._hiddenColumns());
     hidden.has(columnDef) ? hidden.delete(columnDef) : hidden.add(columnDef);
     this._hiddenColumns.set(hidden);
+  }
+
+  // ---- drag-reorder (pure mouse events) ----
+
+  onColHeaderMouseDown(event: MouseEvent, colKey: string): void {
+    if (!this._isDraggable()) return;
+    event.preventDefault(); // prevent text selection on drag
+
+    const THRESHOLD = 5; // px to move before drag is considered intentional
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragging = false;
+
+    const onMove = (e: MouseEvent): void => {
+      if (!dragging) {
+        if (Math.abs(e.clientX - startX) > THRESHOLD || Math.abs(e.clientY - startY) > THRESHOLD) {
+          dragging = true;
+          this._draggingColKey.set(colKey);
+          document.body.style.cursor = 'grabbing';
+          document.body.style.userSelect = 'none';
+        }
+        return;
+      }
+      // Determine which column header the cursor is over
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const th = el?.closest('[data-col-key]') as HTMLElement | null;
+      const over = th ? (th.dataset['colKey'] ?? null) : null;
+      this._dragOverColKey.set(over && over !== colKey ? over : null);
+    };
+
+    const onUp = (e: MouseEvent): void => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+
+      if (!dragging) return;
+
+      // Block the click event that fires after mouseup so mat-sort-header doesn't trigger
+      document.addEventListener(
+        'click',
+        (ev) => { ev.stopPropagation(); ev.preventDefault(); },
+        { capture: true, once: true },
+      );
+
+      const to = this._dragOverColKey();
+      this._draggingColKey.set(null);
+      this._dragOverColKey.set(null);
+
+      if (to && colKey !== to) {
+        const order = [...this._columnOrder()];
+        const fi = order.indexOf(colKey);
+        const ti = order.indexOf(to);
+        if (fi >= 0 && ti >= 0) {
+          order.splice(ti, 0, order.splice(fi, 1)[0]);
+          this._columnOrder.set(order);
+          this.columnOrderChange.emit([...order]);
+        }
+      }
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  // ---- column resize ----
+
+  onResizeStart(event: MouseEvent, colKey: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // The mousedown target is the resize-handle span; walk up to the <th>
+    const thEl   = (event.currentTarget as HTMLElement).closest('th') as HTMLElement;
+    const startX = event.clientX;
+    const startW = this._columnWidths().get(colKey) ?? thEl.offsetWidth;
+
+    const onMove = (e: MouseEvent): void => {
+      const widths = new Map(this._columnWidths());
+      widths.set(colKey, Math.max(50, startW + e.clientX - startX));
+      this._columnWidths.set(widths);
+    };
+
+    const onUp = (): void => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      this.columnWidthChange.emit(Object.fromEntries(this._columnWidths()));
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
   }
 
   // ---- selection ----

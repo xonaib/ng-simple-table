@@ -43,6 +43,8 @@
     (filterChange)="onFilterChange($event)"
     (selectionChange)="onSelectionChange($event)"
     (refresh)="onRefresh()"
+    (columnOrderChange)="onColumnOrderChange($event)"
+    (columnWidthChange)="onColumnWidthChange($event)"
   >
     <!-- custom cell template for the title column — the header is auto-generated
          inside simple-table so mat-sort-header works on all columns uniformly -->

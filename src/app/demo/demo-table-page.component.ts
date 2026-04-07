@@ -51,8 +51,6 @@ export class DemoTablePageComponent {
     isPaginated: true,
     paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
     clientSide: this.isClientSide(),
-    showColumnChooser: true,
-    showRefresh: true,
   }));
 
   // ---- filter options (derived once from the full dataset) ----
@@ -154,6 +152,14 @@ export class DemoTablePageComponent {
   onRefresh(): void {
     this._pageIndex.set(0);
     this._refreshCounter.update(n => n + 1);
+  }
+
+  onColumnOrderChange(order: string[]): void {
+    console.log('[demo] column order:', order);
+  }
+
+  onColumnWidthChange(widths: Record<string, number>): void {
+    console.log('[demo] column widths:', widths);
   }
 
   // ---- helpers ----
