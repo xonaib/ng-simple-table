@@ -31,6 +31,7 @@
                 <mat-checkbox
                   [checked]="!_hiddenColumns().has(col.columnDef)"
                   [disableRipple]="true"
+                  (change)="onColumnChooserCheckboxChange(col.columnDef, $event)"
                   (click)="$event.stopPropagation()"
                 >
                   {{ col.header ?? col.columnDef | titlecase }}

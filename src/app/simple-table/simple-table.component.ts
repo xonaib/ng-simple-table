@@ -19,7 +19,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
-import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -421,6 +421,14 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   toggleColumn(columnDef: string): void {
     const hidden = new Set(this._hiddenColumns());
     hidden.has(columnDef) ? hidden.delete(columnDef) : hidden.add(columnDef);
+    this._hiddenColumns.set(hidden);
+  }
+
+  /** Checkbox stops click bubbling to the menu-item button, so visibility must sync from `(change)`. */
+  onColumnChooserCheckboxChange(columnDef: string, e: MatCheckboxChange): void {
+    const hidden = new Set(this._hiddenColumns());
+    if (e.checked) hidden.delete(columnDef);
+    else hidden.add(columnDef);
     this._hiddenColumns.set(hidden);
   }
 
