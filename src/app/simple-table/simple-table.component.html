@@ -122,17 +122,6 @@
           </div>
         </ng-template>
 
-        @if (_isDraggable()) {
-          <mat-icon
-            cdkDragHandle
-            class="st-header-drag-handle"
-            aria-label="Reorder column"
-            tabindex="0"
-          >
-            drag_indicator
-          </mat-icon>
-        }
-
         <span
           mat-sort-header
           [disabled]="!column.isSortable"
