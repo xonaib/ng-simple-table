@@ -51,6 +51,8 @@ export class DemoTablePageComponent {
     isPaginated: true,
     paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
     clientSide: this.isClientSide(),
+    showColumnChooser: true,
+    showRefresh: true,
   }));
 
   // ---- filter options (derived once from the full dataset) ----
@@ -59,10 +61,11 @@ export class DemoTablePageComponent {
 
   // ---- server-side state signals ----
 
-  private readonly _activeFilters = signal<Map<string, ItemParent>>(new Map());
-  private readonly _sortState     = signal<Sort | null>(null);
-  readonly _pageIndex             = signal(0);   // non-private: passed to simple-table [pageIndex]
-  private readonly _pageSize      = signal(10);
+  private readonly _activeFilters  = signal<Map<string, ItemParent>>(new Map());
+  private readonly _sortState      = signal<Sort | null>(null);
+  readonly _pageIndex              = signal(0);   // non-private: passed to simple-table [pageIndex]
+  private readonly _pageSize       = signal(10);
+  private readonly _refreshCounter = signal(0);
 
   // ---- HTTP params (server-side mode) ----
 
@@ -84,9 +87,11 @@ export class DemoTablePageComponent {
   });
 
   // Combined trigger so switching modes also fires a new request.
+  // _refreshCounter is included so incrementing it forces a new HTTP request.
   private readonly _queryTrigger = computed(() => ({
     clientSide: this.isClientSide(),
     params:     this._serverSideParams(),
+    refresh:    this._refreshCounter(),
   }));
 
   // ---- loading + HTTP response ----
@@ -144,6 +149,11 @@ export class DemoTablePageComponent {
 
   onSelectionChange(rows: Task[]): void {
     this.selectedTasks.set(rows);
+  }
+
+  onRefresh(): void {
+    this._pageIndex.set(0);
+    this._refreshCounter.update(n => n + 1);
   }
 
   // ---- helpers ----

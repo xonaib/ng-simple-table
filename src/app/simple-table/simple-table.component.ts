@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   TemplateRef,
+  computed,
   contentChildren,
   effect,
   inject,
@@ -19,6 +20,8 @@ import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatMenuModule } from '@angular/material/menu';
 import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
 import { Observable, isObservable, of as observableOf } from 'rxjs';
 import { ColumnFilterComponent } from './column-filter/column-filter.component';
@@ -36,6 +39,8 @@ import { ColumnFiltersData, ColumnDef, ItemParent, TableConfig } from './table.t
     MatCheckboxModule,
     MatPaginatorModule,
     MatIconModule,
+    MatButtonModule,
+    MatMenuModule,
     ColumnFilterComponent,
   ],
   templateUrl: './simple-table.component.html',
@@ -83,14 +88,34 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly filterChange = output<Map<string, ItemParent>>();
   /** emits Angular Material's Sort object on column sort change */
   readonly sortChange = output<Sort>();
+  /** emits when the refresh button is clicked; host is responsible for re-fetching data */
+  readonly refresh = output<void>();
 
   // ---- internal state (template-accessible) ----
 
   readonly _data = signal<T[]>([]);
-  _headers: string[] = [];
-  _dataColumns: ColumnDef[] = [];
   readonly columnFilters = signal<Map<string, ItemParent>>(new Map());
   readonly customCellTemplates = new Map<string, TemplateRef<{ $implicit: unknown }>>();
+
+  /** All non-select columns — drives the matColumnDef block rendering (always all columns) */
+  readonly _allDataColumns = computed(() =>
+    this.tableColumns().filter(col => col.columnDef !== 'select')
+  );
+
+  /** Column keys currently hidden by the column chooser */
+  readonly _hiddenColumns = signal<Set<string>>(new Set());
+
+  /** Visible column keys (including select) — drives the table row layout */
+  readonly _headers = computed(() =>
+    this.tableColumns()
+      .map(col => col.columnDef)
+      .filter(key => !this._hiddenColumns().has(key))
+  );
+
+  /** True when at least one toolbar action is enabled */
+  readonly _hasToolbar = computed(() =>
+    !!(this.tableConfig().showColumnChooser || this.tableConfig().showRefresh)
+  );
 
   /** owned MatTableDataSource used when clientSide: true */
   readonly _matDs = new MatTableDataSource<T>();
@@ -220,16 +245,12 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   private _populateColumns(): void {
     this.customCellTemplates.clear();
     this.cellDefs().forEach((d) => this.customCellTemplates.set(d.columnDef(), d.template));
+  }
 
-    this._headers = [];
-    this._dataColumns = [];
-
-    this.tableColumns().forEach((col: ColumnDef) => {
-      this._headers.push(col.columnDef);
-      if (col.columnDef !== 'select') {
-        this._dataColumns.push(col);
-      }
-    });
+  toggleColumn(columnDef: string): void {
+    const hidden = new Set(this._hiddenColumns());
+    hidden.has(columnDef) ? hidden.delete(columnDef) : hidden.add(columnDef);
+    this._hiddenColumns.set(hidden);
   }
 
   // ---- selection ----

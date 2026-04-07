@@ -20,6 +20,10 @@ export interface TableConfig {
    * wiring up page/sort/filter event handlers.
    */
   clientSide?: boolean;
+  /** Show a column chooser button in the toolbar to toggle column visibility. */
+  showColumnChooser?: boolean;
+  /** Show a refresh button in the toolbar; emits the `refresh` output when clicked. */
+  showRefresh?: boolean;
 }
 
 export interface PaginationOptions {

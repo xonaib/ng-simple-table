@@ -1,3 +1,27 @@
+@if (_hasToolbar()) {
+  <div class="st-toolbar">
+    @if (tableConfig().showColumnChooser) {
+      <button mat-icon-button [matMenuTriggerFor]="colMenu" aria-label="Choose columns">
+        <mat-icon>view_week</mat-icon>
+      </button>
+      <mat-menu #colMenu>
+        @for (col of _allDataColumns(); track col.columnDef) {
+          <button mat-menu-item (click)="$event.stopPropagation(); toggleColumn(col.columnDef)">
+            <mat-checkbox [checked]="!_hiddenColumns().has(col.columnDef)" [disableRipple]="true">
+              {{ col.header ?? col.columnDef | titlecase }}
+            </mat-checkbox>
+          </button>
+        }
+      </mat-menu>
+    }
+    @if (tableConfig().showRefresh) {
+      <button mat-icon-button (click)="refresh.emit()" aria-label="Refresh data">
+        <mat-icon>refresh</mat-icon>
+      </button>
+    }
+  </div>
+}
+
 <table
   class="simple-table"
   mat-table
@@ -28,8 +52,9 @@
   </ng-container>
 
   <!-- all data columns: header always auto-generated (so mat-sort-header works);
-       cell uses a custom cellDef template when provided, otherwise renders the value directly -->
-  @for (column of _dataColumns; track column.columnDef) {
+       cell uses a custom cellDef template when provided, otherwise renders the value directly.
+       All columns are declared here even if hidden so Material Table can restore them. -->
+  @for (column of _allDataColumns(); track column.columnDef) {
     <ng-container [matColumnDef]="column.columnDef">
       <th
         mat-header-cell
@@ -64,10 +89,10 @@
     </ng-container>
   }
 
-  <tr mat-header-row *matHeaderRowDef="_headers; sticky: stickyHeaders()"></tr>
+  <tr mat-header-row *matHeaderRowDef="_headers(); sticky: stickyHeaders()"></tr>
   <tr
     mat-row
-    *matRowDef="let row; columns: _headers"
+    *matRowDef="let row; columns: _headers()"
     [class.selected-row]="selection.isSelected(row)"
     (click)="selection.toggle(row)"
   ></tr>
