@@ -15,6 +15,36 @@
   background: var(--mat-sys-surface);
 }
 
+// ---- column chooser (menu content stays in this component’s template) ----
+
+.st-column-chooser-drop-list {
+  min-width: 260px;
+  padding: 4px 0;
+}
+
+// mat-mdc-menu-item is already display:flex; icon is projected before .mat-mdc-menu-item-text
+.st-column-chooser-handle {
+  cursor: grab;
+  color: var(--mat-sys-on-surface-variant);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.st-column-chooser-row:hover .st-column-chooser-handle,
+.st-column-chooser-handle:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.st-column-chooser-row.cdk-drag-placeholder {
+  min-height: 48px;
+  background: var(--mat-sys-surface-container-highest);
+  border-radius: 4px;
+  margin: 0 8px;
+}
+
 .simple-table {
   width: 100%;
   border-collapse: collapse;
@@ -47,11 +77,6 @@
 
     &.filter-col {
       padding-right: var(--st-header-filter-pad-right);
-    }
-
-    // draggable cursor (cdkDrag lives on .st-header-drag-root inside the cell)
-    &.draggable .st-header-drag-root {
-      cursor: grab;
     }
 
     .st-header-drag-root.cdk-drag-animating {
@@ -92,6 +117,26 @@
 
   th.mat-mdc-header-cell.filter-col > .cdk-drag-placeholder.st-cdk-column-header-placeholder {
     right: var(--st-header-filter-pad-right);
+  }
+
+  .st-header-drag-handle {
+    cursor: grab;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    font-size: 18px;
+    line-height: 20px;
+    margin-inline-end: 4px;
+    color: var(--mat-sys-on-surface-variant);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+  }
+
+  th.mat-mdc-header-cell.draggable:hover .st-header-drag-handle,
+  .st-header-drag-handle:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .st-header-sort-label {

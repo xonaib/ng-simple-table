@@ -26,6 +26,7 @@ import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
 import {
   CdkDragDrop,
   CdkDrag,
+  CdkDragHandle,
   CdkDragPlaceholder,
   CdkDragPreview,
   CdkDropList,
@@ -52,6 +53,7 @@ import { ColumnFiltersData, ColumnDef, ItemParent, TableConfig } from './table.t
     MatButtonModule,
     MatMenuModule,
     CdkDrag,
+    CdkDragHandle,
     CdkDragPlaceholder,
     CdkDragPreview,
     CdkDropList,
@@ -126,6 +128,23 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly _allDataColumns = computed(() =>
     this.tableColumns().filter(col => col.columnDef !== 'select')
   );
+
+  /**
+   * Same defs as _allDataColumns but ordered by _columnOrder (for the column chooser menu).
+   * Appends any column missing from the order (e.g. host added a column at runtime).
+   */
+  readonly _chooserColumnDefs = computed((): ColumnDef[] => {
+    const byKey = new Map(this._allDataColumns().map((c) => [c.columnDef, c] as const));
+    const out: ColumnDef[] = [];
+    for (const key of this._columnOrder()) {
+      const c = byKey.get(key);
+      if (c) out.push(c);
+    }
+    for (const c of this._allDataColumns()) {
+      if (!out.some((x) => x.columnDef === c.columnDef)) out.push(c);
+    }
+    return out;
+  });
 
   /** Column keys currently hidden by the column chooser */
   readonly _hiddenColumns = signal<Set<string>>(new Set());
@@ -217,6 +236,21 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       }
       return true;
     };
+
+    // Keep _columnOrder in sync when tableColumns gains/loses non-select columns after init.
+    effect(() => {
+      const keys = this._allDataColumns().map((c) => c.columnDef);
+      const keySet = new Set(keys);
+      this._columnOrder.update((order) => {
+        if (!order.length) return order;
+        let next = order.filter((k) => keySet.has(k));
+        for (const k of keys) {
+          if (!next.includes(k)) next.push(k);
+        }
+        if (next.length === order.length && next.every((k, i) => k === order[i])) return order;
+        return next;
+      });
+    });
   }
 
   // ---- lifecycle ----
@@ -315,6 +349,15 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     if (fi < 0 || ti < 0) return;
 
     moveItemInArray(order, fi, ti);
+    this._columnOrder.set(order);
+    this.columnOrderChange.emit([...order]);
+  }
+
+  /** Column chooser menu: reorder only; list order matches _chooserColumnDefs / _columnOrder. */
+  onColumnChooserDrop(event: CdkDragDrop<void>): void {
+    if (event.previousIndex === event.currentIndex) return;
+    const order = [...this._columnOrder()];
+    moveItemInArray(order, event.previousIndex, event.currentIndex);
     this._columnOrder.set(order);
     this.columnOrderChange.emit([...order]);
   }

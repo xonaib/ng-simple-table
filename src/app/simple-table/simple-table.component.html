@@ -4,14 +4,41 @@
       <button mat-icon-button [matMenuTriggerFor]="colMenu" aria-label="Choose columns">
         <mat-icon>view_week</mat-icon>
       </button>
-      <mat-menu #colMenu>
-        @for (col of _allDataColumns(); track col.columnDef) {
-          <button mat-menu-item (click)="$event.stopPropagation(); toggleColumn(col.columnDef)">
-            <mat-checkbox [checked]="!_hiddenColumns().has(col.columnDef)" [disableRipple]="true">
-              {{ col.header ?? col.columnDef | titlecase }}
-            </mat-checkbox>
-          </button>
-        }
+      <mat-menu #colMenu panelClass="st-column-chooser-panel">
+        <div
+          class="st-column-chooser-drop-list"
+          cdkDropList
+          cdkDropListOrientation="vertical"
+          (cdkDropListDropped)="onColumnChooserDrop($event)"
+        >
+          @for (col of _chooserColumnDefs(); track col.columnDef) {
+            <div class="st-column-chooser-row" cdkDrag>
+              <button
+                mat-menu-item
+                type="button"
+                class="st-column-chooser-item"
+                (click)="$event.stopPropagation(); toggleColumn(col.columnDef)"
+              >
+                <mat-icon
+                  cdkDragHandle
+                  class="st-column-chooser-handle"
+                  aria-label="Reorder column"
+                  tabindex="0"
+                  (pointerdown)="$event.stopPropagation()"
+                >
+                  drag_indicator
+                </mat-icon>
+                <mat-checkbox
+                  [checked]="!_hiddenColumns().has(col.columnDef)"
+                  [disableRipple]="true"
+                  (click)="$event.stopPropagation()"
+                >
+                  {{ col.header ?? col.columnDef | titlecase }}
+                </mat-checkbox>
+              </button>
+            </div>
+          }
+        </div>
       </mat-menu>
     }
     @if (_showRefresh()) {
@@ -94,6 +121,17 @@
             {{ column.header ?? column.columnDef | titlecase }}
           </div>
         </ng-template>
+
+        @if (_isDraggable()) {
+          <mat-icon
+            cdkDragHandle
+            class="st-header-drag-handle"
+            aria-label="Reorder column"
+            tabindex="0"
+          >
+            drag_indicator
+          </mat-icon>
+        }
 
         <span
           mat-sort-header
