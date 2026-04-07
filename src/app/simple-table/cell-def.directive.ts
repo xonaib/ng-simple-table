@@ -6,6 +6,7 @@ import { Directive, TemplateRef, inject, input } from '@angular/core';
   standalone: true,
 })
 export class CellDefDirective {
-  readonly columnDef = input.required<string>({ alias: 'cellDef' });
+  /** Template still uses the `cellDef` attribute; value is the same as `ColumnDef.key`. */
+  readonly key = input.required<string>({ alias: 'cellDef' });
   readonly template = inject(TemplateRef<{ $implicit: unknown }>);
 }

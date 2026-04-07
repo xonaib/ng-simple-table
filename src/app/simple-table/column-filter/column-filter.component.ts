@@ -113,7 +113,7 @@ export class ColumnFilterComponent {
 
   clearFilter(): void {
     this._pendingKeys.set(new Set());
-    this.filterCleared.emit(this.column().columnDef);
+    this.filterCleared.emit(this.column().key);
     this.isMenuOpen.set(false);
   }
 }

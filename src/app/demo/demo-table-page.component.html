@@ -47,7 +47,6 @@
     [tableConfig]="effectiveConfig()"
     [length]="effectiveLength()"
     [pageIndex]="isClientSide() ? undefined : _pageIndex()"
-    [columnFiltersData]="filtersData"
     (page)="onPage($event)"
     (sortChange)="onSortChange($event)"
     (filterChange)="onFilterChange($event)"

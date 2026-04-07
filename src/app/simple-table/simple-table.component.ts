@@ -19,7 +19,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
-import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -39,8 +39,8 @@ import { Observable, isObservable, of as observableOf } from 'rxjs';
 import { ColumnFilterComponent } from './column-filter/column-filter.component';
 import { CellDefDirective } from './cell-def.directive';
 import {
-  ColumnFiltersData,
   ColumnDef,
+  FilterType,
   ItemParent,
   SIMPLE_TABLE_LAYOUT_FILLER_COLUMN,
   TableConfig,
@@ -105,9 +105,6 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * after a sort or filter change. Has no effect in client-side mode.
    */
   readonly pageIndex = input<number | undefined>(undefined);
-  readonly columnFiltersData = input<
-    ColumnFiltersData | Observable<ColumnFiltersData> | undefined
-  >();
   readonly stickyHeaders = input(false);
   readonly selectedRows = input<T[] | undefined>();
 
@@ -117,7 +114,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly page = output<PageEvent>();
   /** emits full array of currently selected rows */
   readonly selectionChange = output<T[]>();
-  /** emits the current filter map keyed by columnDef when Apply or Clear is clicked */
+  /** emits the current filter map keyed by column `key` when Apply or Clear is clicked */
   readonly filterChange = output<Map<string, ItemParent>>();
   /** emits Angular Material's Sort object on column sort change */
   readonly sortChange = output<Sort>();
@@ -125,7 +122,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly refresh = output<void>();
   /** emits the new column key order (excluding 'select') after a drag-reorder */
   readonly columnOrderChange = output<string[]>();
-  /** emits a map of columnDef → width in px after a resize interaction */
+  /** emits a map of column `key` → width in px after a resize interaction */
   readonly columnWidthChange = output<Record<string, number>>();
 
   // ---- internal state (template-accessible) ----
@@ -142,7 +139,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * reset Material Table's internal state and break data-row updates when _headers() changes.
    */
   readonly _allDataColumns = computed(() =>
-    this.tableColumns().filter(col => col.columnDef !== 'select')
+    this.tableColumns().filter(col => col.key !== 'select')
   );
 
   /**
@@ -150,14 +147,14 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * Appends any column missing from the order (e.g. host added a column at runtime).
    */
   readonly _chooserColumnDefs = computed((): ColumnDef[] => {
-    const byKey = new Map(this._allDataColumns().map((c) => [c.columnDef, c] as const));
+    const byKey = new Map(this._allDataColumns().map((c) => [c.key, c] as const));
     const out: ColumnDef[] = [];
     for (const key of this._columnOrder()) {
       const c = byKey.get(key);
       if (c) out.push(c);
     }
     for (const c of this._allDataColumns()) {
-      if (!out.some((x) => x.columnDef === c.columnDef)) out.push(c);
+      if (!out.some((x) => x.key === c.key)) out.push(c);
     }
     return out;
   });
@@ -179,8 +176,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     const order = this._columnOrder();
     const map = this._columnWidths();
 
-    if (cols.some((c) => c.columnDef === 'select')) {
-      const sel = cols.find((c) => c.columnDef === 'select');
+    if (cols.some((c) => c.key === 'select')) {
+      const sel = cols.find((c) => c.key === 'select');
       const rw = map.get('select');
       if (rw != null) sum += rw;
       else {
@@ -191,7 +188,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
     for (const key of order) {
       if (hidden.has(key)) continue;
-      const col = cols.find((c) => c.columnDef === key);
+      const col = cols.find((c) => c.key === key);
       if (!col) continue;
       const rw = map.get(key);
       if (rw != null) {
@@ -230,7 +227,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly _headers = computed(() => {
     const order = this._columnOrder();
     const hidden = this._hiddenColumns();
-    const hasSelect = this.tableColumns().some((c) => c.columnDef === 'select');
+    const hasSelect = this.tableColumns().some((c) => c.key === 'select');
     const visible = order.filter((key) => !hidden.has(key));
     const base = hasSelect ? ['select', ...visible] : visible;
     if (this._fillerActive()) {
@@ -262,7 +259,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       this._switchDataSource(this.dataSource());
     });
     effect(() => {
-      this._subscribeToFilters(this.columnFiltersData());
+      this._rebuildColumnFilterOptionsFromData();
     });
     effect(() => {
       const rows = this.selectedRows();
@@ -314,7 +311,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
     // Keep _columnOrder in sync when tableColumns gains/loses non-select columns after init.
     effect(() => {
-      const keys = this._allDataColumns().map((c) => c.columnDef);
+      const keys = this._allDataColumns().map((c) => c.key);
       const keySet = new Set(keys);
       this._columnOrder.update((order) => {
         if (!order.length) return order;
@@ -349,8 +346,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     // Initialise display order from the host-provided column list
     this._columnOrder.set(
       this.tableColumns()
-        .filter(col => col.columnDef !== 'select')
-        .map(col => col.columnDef),
+        .filter(col => col.key !== 'select')
+        .map(col => col.key),
     );
   }
 
@@ -367,22 +364,81 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   // ---- filters ----
 
-  private _subscribeToFilters(
-    source: ColumnFiltersData | Observable<ColumnFiltersData> | undefined,
-  ): void {
-    if (!source) return;
-    const stream = isObservable(source) ? source : observableOf(source as ColumnFiltersData);
+  /**
+   * Builds dropdown options from the same row array the table uses (`_data()`).
+   * Server-side: usually the current API page — distinct values can change each fetch.
+   * Client-side: the full array you pass as `dataSource` (not the paginated view).
+   * Preserves `selectedKeys` when still present; drops keys no longer in the list.
+   */
+  private _rebuildColumnFilterOptionsFromData(): void {
+    void this.tableConfig();
+    const rows = this._data();
+    const cols = this.tableColumns().filter(
+      (c) => c.hasColumnFilters && (c.filterType ?? FilterType.DropDown) === FilterType.DropDown,
+    );
+    const prev = this.columnFilters();
+    const next = new Map<string, ItemParent>();
 
-    stream.pipe(takeUntilDestroyed(this._destroyRef)).subscribe((data: ColumnFiltersData) => {
-      const map = new Map<string, ItemParent>();
-      data.parents.forEach((p) => map.set(String(p.id), p));
-      this.columnFilters.set(map);
-    });
+    for (const col of cols) {
+      const uniq = [
+        ...new Set(rows.map((r) => String((r as Record<string, unknown>)[col.key]))),
+      ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      const allowed = new Set(uniq);
+      const old = prev.get(col.key);
+      const selectedKeys = (old?.selectedKeys ?? []).filter((k) => allowed.has(String(k)));
+      next.set(col.key, {
+        id: col.key,
+        children: uniq.map((v) => ({ id: v, value: v })),
+        selectedKeys,
+      });
+    }
+
+    let changed = prev.size !== next.size;
+    if (!changed) {
+      for (const [k, v] of next) {
+        const o = prev.get(k);
+        if (!o) {
+          changed = true;
+          break;
+        }
+        const sk0 = [...(o.selectedKeys ?? [])].sort().join('\0');
+        const sk1 = [...(v.selectedKeys ?? [])].sort().join('\0');
+        if (sk0 !== sk1 || o.children?.length !== v.children?.length) {
+          changed = true;
+          break;
+        }
+        const ch0 = (o.children ?? []).map((c) => String(c.id)).join('\0');
+        const ch1 = (v.children ?? []).map((c) => String(c.id)).join('\0');
+        if (ch0 !== ch1) {
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    if (!changed) return;
+
+    const selSig = (m: Map<string, ItemParent>) =>
+      [...m.entries()]
+        .map(([k, p]) => `${k}=${[...(p.selectedKeys ?? [])].sort().join(',')}`)
+        .sort()
+        .join(';');
+
+    this.columnFilters.set(next);
+
+    if (!this.tableConfig().clientSide && selSig(prev) !== selSig(next)) {
+      this.filterChange.emit(new Map(next));
+    }
+
+    if (this.tableConfig().clientSide) {
+      this._syncMatDsFilter(next);
+      this._matDs.data = [...this._matDs.data];
+    }
   }
 
-  onFilterApplied(columnDef: string, parent: ItemParent): void {
+  onFilterApplied(colKey: string, parent: ItemParent): void {
     const map = new Map(this.columnFilters());
-    map.set(columnDef, parent);
+    map.set(colKey, parent);
     this.columnFilters.set(map);
     this.filterChange.emit(new Map(map));
     if (this.tableConfig().clientSide) {
@@ -390,11 +446,11 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     }
   }
 
-  onFilterCleared(columnDef: string): void {
+  onFilterCleared(colKey: string): void {
     const map = new Map(this.columnFilters());
-    const current = map.get(columnDef);
+    const current = map.get(colKey);
     if (current) {
-      map.set(columnDef, { ...current, selectedKeys: [] });
+      map.set(colKey, { ...current, selectedKeys: [] });
     }
     this.columnFilters.set(map);
     this.filterChange.emit(new Map(map));
@@ -415,12 +471,20 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   private _populateColumns(): void {
     this.customCellTemplates.clear();
-    this.cellDefs().forEach((d) => this.customCellTemplates.set(d.columnDef(), d.template));
+    this.cellDefs().forEach((d) => this.customCellTemplates.set(d.key(), d.template));
   }
 
-  toggleColumn(columnDef: string): void {
+  toggleColumn(colKey: string): void {
     const hidden = new Set(this._hiddenColumns());
-    hidden.has(columnDef) ? hidden.delete(columnDef) : hidden.add(columnDef);
+    hidden.has(colKey) ? hidden.delete(colKey) : hidden.add(colKey);
+    this._hiddenColumns.set(hidden);
+  }
+
+  /** Checkbox stops click bubbling to the menu-item button, so visibility must sync from `(change)`. */
+  onColumnChooserCheckboxChange(colKey: string, e: MatCheckboxChange): void {
+    const hidden = new Set(this._hiddenColumns());
+    if (e.checked) hidden.delete(colKey);
+    else hidden.add(colKey);
     this._hiddenColumns.set(hidden);
   }
 
@@ -454,7 +518,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   /** Effective CSS `width` for a data column (resize overrides `ColumnDef.width`). */
   effectiveWidthStyleForDataColumn(column: ColumnDef): string | null {
-    const rw = this._columnWidths().get(column.columnDef);
+    const rw = this._columnWidths().get(column.key);
     if (rw != null) return `${rw}px`;
     return this._formatCssWidth(column.width);
   }
@@ -469,13 +533,13 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   /** `select` is never sortable; otherwise sortable unless `sortable === false`. */
   isColumnSortable(column: ColumnDef): boolean {
-    if (column.columnDef === 'select') return false;
+    if (column.key === 'select') return false;
     return column.sortable !== false;
   }
 
   /** Effective CSS `width` for the select column. */
   effectiveWidthStyleForSelect(): string | null {
-    const sel = this.tableColumns().find((c) => c.columnDef === 'select');
+    const sel = this.tableColumns().find((c) => c.key === 'select');
     const rw = this._columnWidths().get('select');
     if (rw != null) return `${rw}px`;
     return sel ? this._formatCssWidth(sel.width) : null;
@@ -505,7 +569,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     // The mousedown target is the resize-handle span; walk up to the <th>
     const thEl = (event.currentTarget as HTMLElement).closest('th') as HTMLElement;
     const startX = event.clientX;
-    const col = this.tableColumns().find((c) => c.columnDef === colKey);
+    const col = this.tableColumns().find((c) => c.key === colKey);
     const fromDef = col ? this._parseDefWidthToPx(col.width) : null;
     const startW = this._columnWidths().get(colKey) ?? fromDef ?? thEl.offsetWidth;
 
