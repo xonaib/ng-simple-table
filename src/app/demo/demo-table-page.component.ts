@@ -9,13 +9,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { SimpleTableComponent } from '../simple-table/simple-table.component';
 import { CellDefDirective } from '../simple-table/cell-def.directive';
-import {
-  ColumnFiltersData,
-  ColumnDef,
-  FilterType,
-  ItemParent,
-  TableConfig,
-} from '../simple-table/table.types';
+import { ColumnDef, FilterType, ItemParent, TableConfig } from '../simple-table/table.types';
 import { Task, TASKS } from './demo-data';
 import { TasksResponse } from './tasks.interceptor';
 
@@ -33,14 +27,14 @@ export class DemoTablePageComponent {
   // ---- column definitions ----
 
   readonly columns: ColumnDef[] = [
-    { columnDef: 'select' },
-    { columnDef: 'id',          header: 'ID',          width: 72 },
-    { columnDef: 'title',       header: 'Title',       width: 200 },
-    { columnDef: 'assignee',    header: 'Assignee',    hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'status',      header: 'Status',      hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'priority',    header: 'Priority',    hasColumnFilters: true, filterType: FilterType.DropDown },
-    { columnDef: 'dueDate',     header: 'Due Date' },
-    { columnDef: 'storyPoints', header: 'Points' },
+    { key: 'select' },
+    { key: 'id',          label: 'ID',          width: 72 },
+    { key: 'title',       label: 'Title',       width: 200 },
+    { key: 'assignee',    label: 'Assignee',    hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'status',      label: 'Status',      hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'priority',    label: 'Priority',    hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'dueDate',     label: 'Due Date' },
+    { key: 'storyPoints', label: 'Points' },
   ];
 
   // ---- mode toggle ----
@@ -52,10 +46,6 @@ export class DemoTablePageComponent {
     paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
     clientSide: this.isClientSide(),
   }));
-
-  // ---- filter options (derived once from the full dataset) ----
-
-  readonly filtersData: ColumnFiltersData = this._buildFiltersData();
 
   // ---- server-side state signals ----
 
@@ -160,20 +150,5 @@ export class DemoTablePageComponent {
 
   onColumnWidthChange(widths: Record<string, number>): void {
     console.log('[demo] column widths:', widths);
-  }
-
-  // ---- helpers ----
-
-  private _buildFiltersData(): ColumnFiltersData {
-    const unique = (key: keyof Task) =>
-      [...new Set(TASKS.map(t => String(t[key])))].sort();
-
-    return {
-      parents: [
-        { id: 'assignee', children: unique('assignee').map(v => ({ id: v, value: v })) },
-        { id: 'status',   children: unique('status').map(v   => ({ id: v, value: v })) },
-        { id: 'priority', children: unique('priority').map(v => ({ id: v, value: v })) },
-      ],
-    };
   }
 }

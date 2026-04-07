@@ -11,13 +11,13 @@
           cdkDropListOrientation="vertical"
           (cdkDropListDropped)="onColumnChooserDrop($event)"
         >
-          @for (col of _chooserColumnDefs(); track col.columnDef) {
+          @for (col of _chooserColumnDefs(); track col.key) {
             <div class="st-column-chooser-row" cdkDrag>
               <button
                 mat-menu-item
                 type="button"
                 class="st-column-chooser-item"
-                (click)="$event.stopPropagation(); toggleColumn(col.columnDef)"
+                (click)="$event.stopPropagation(); toggleColumn(col.key)"
               >
                 <mat-icon
                   cdkDragHandle
@@ -29,12 +29,12 @@
                   drag_indicator
                 </mat-icon>
                 <mat-checkbox
-                  [checked]="!_hiddenColumns().has(col.columnDef)"
+                  [checked]="!_hiddenColumns().has(col.key)"
                   [disableRipple]="true"
-                  (change)="onColumnChooserCheckboxChange(col.columnDef, $event)"
+                  (change)="onColumnChooserCheckboxChange(col.key, $event)"
                   (click)="$event.stopPropagation()"
                 >
-                  {{ col.header ?? col.columnDef | titlecase }}
+                  {{ col.label ?? col.key | titlecase }}
                 </mat-checkbox>
               </button>
             </div>
@@ -87,14 +87,14 @@
        cdkDropList must live on <th> while cdkDrag wraps the cell contents: putting both on the
        same element makes previousContainer === container on every drop, so _columnOrder never
        updates and body columns stay out of sync with the header. -->
-  <ng-container *ngFor="let column of _allDataColumns()" [matColumnDef]="column.columnDef">
+  <ng-container *ngFor="let column of _allDataColumns()" [matColumnDef]="column.key">
     <th
       mat-header-cell
       *matHeaderCellDef
       cdkDropList
       cdkDropListOrientation="horizontal"
       cdkDropListSortingDisabled
-      [cdkDropListData]="column.columnDef"
+      [cdkDropListData]="column.key"
       [cdkDropListDisabled]="!_isDraggable()"
       (cdkDropListDropped)="onColumnDrop($event)"
       [class.filter-col]="column.hasColumnFilters"
@@ -105,7 +105,7 @@
       <div
         class="st-header-drag-root"
         cdkDrag
-        [cdkDragData]="column.columnDef"
+        [cdkDragData]="column.key"
         [cdkDragDisabled]="!_isDraggable()"
         cdkDragLockAxis="x"
       >
@@ -113,7 +113,7 @@
              styles, so it looks like a tiny unstyled chip. matchSize keeps the real header bounds. -->
         <ng-template cdkDragPreview matchSize>
           <div class="st-cdk-column-header-preview">
-            {{ column.header ?? column.columnDef | titlecase }}
+            {{ column.label ?? column.key | titlecase }}
           </div>
         </ng-template>
 
@@ -121,7 +121,7 @@
              horizontal sorting also applies translate3d to siblings, which breaks <th> layout. -->
         <ng-template cdkDragPlaceholder>
           <div class="st-cdk-column-header-placeholder" aria-hidden="true">
-            {{ column.header ?? column.columnDef | titlecase }}
+            {{ column.label ?? column.key | titlecase }}
           </div>
         </ng-template>
 
@@ -130,14 +130,14 @@
           [disabled]="!isColumnSortable(column)"
           class="st-header-sort-label"
         >
-          {{ column.header ?? column.columnDef | titlecase }}
+          {{ column.label ?? column.key | titlecase }}
         </span>
 
         @if (column.hasColumnFilters) {
           <column-filter
-            [filter]="columnFilters().get(column.columnDef)"
+            [filter]="columnFilters().get(column.key)"
             [column]="column"
-            (filterApplied)="onFilterApplied(column.columnDef, $event)"
+            (filterApplied)="onFilterApplied(column.key, $event)"
             (filterCleared)="onFilterCleared($event)"
             (click)="$event.stopPropagation()"
             (pointerdown)="$event.stopPropagation()"
@@ -149,7 +149,7 @@
           <span
             class="resize-handle"
             (pointerdown)="$event.stopPropagation()"
-            (mousedown)="onResizeStart($event, column.columnDef)"
+            (mousedown)="onResizeStart($event, column.key)"
           ></span>
         }
       </div>
@@ -160,13 +160,13 @@
       [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
       [style.width]="effectiveWidthStyleForDataColumn(column)"
     >
-      @if (customCellTemplates.get(column.columnDef); as cellTmpl) {
+      @if (customCellTemplates.get(column.key); as cellTmpl) {
         <ng-container
           [ngTemplateOutlet]="cellTmpl"
           [ngTemplateOutletContext]="{ $implicit: row }"
         ></ng-container>
       } @else {
-        {{ row[column.columnDef] }}
+        {{ row[column.key] }}
       }
     </td>
   </ng-container>
