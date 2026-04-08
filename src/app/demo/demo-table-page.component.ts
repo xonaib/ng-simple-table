@@ -28,12 +28,12 @@ export class DemoTablePageComponent {
 
   readonly columns: ColumnDef[] = [
     { key: 'select' },
-    { key: 'id',          label: 'ID',          width: 72 },
-    { key: 'title',       label: 'Title',       width: 200 },
-    { key: 'assignee',    label: 'Assignee',    hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'status',      label: 'Status',      hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'priority',    label: 'Priority',    hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'dueDate',     label: 'Due Date' },
+    { key: 'id', label: 'ID', width: 72 },
+    { key: 'title', label: 'Title', width: 200, hasColumnFilters: true },
+    { key: 'assignee', label: 'Assignee', hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'status', label: 'Status', hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'priority', label: 'Priority', hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'dueDate', label: 'Due Date' },
     { key: 'storyPoints', label: 'Points' },
   ];
 
@@ -41,18 +41,20 @@ export class DemoTablePageComponent {
 
   readonly isClientSide = signal(false);
 
-  readonly effectiveConfig = computed((): TableConfig => ({
-    isPaginated: true,
-    paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
-    clientSide: this.isClientSide(),
-  }));
+  readonly effectiveConfig = computed(
+    (): TableConfig => ({
+      isPaginated: true,
+      paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
+      clientSide: this.isClientSide(),
+    }),
+  );
 
   // ---- server-side state signals ----
 
-  private readonly _activeFilters  = signal<Map<string, ItemParent>>(new Map());
-  private readonly _sortState      = signal<Sort | null>(null);
-  readonly _pageIndex              = signal(0);   // non-private: passed to simple-table [pageIndex]
-  private readonly _pageSize       = signal(10);
+  private readonly _activeFilters = signal<Map<string, ItemParent>>(new Map());
+  private readonly _sortState = signal<Sort | null>(null);
+  readonly _pageIndex = signal(0); // non-private: passed to simple-table [pageIndex]
+  private readonly _pageSize = signal(10);
   private readonly _refreshCounter = signal(0);
 
   // ---- HTTP params (server-side mode) ----
@@ -64,7 +66,7 @@ export class DemoTablePageComponent {
     };
     const sort = this._sortState();
     if (sort?.active && sort.direction) {
-      params['sort']      = sort.active;
+      params['sort'] = sort.active;
       params['direction'] = sort.direction;
     }
     for (const [col, parent] of this._activeFilters()) {
@@ -78,8 +80,8 @@ export class DemoTablePageComponent {
   // _refreshCounter is included so incrementing it forces a new HTTP request.
   private readonly _queryTrigger = computed(() => ({
     clientSide: this.isClientSide(),
-    params:     this._serverSideParams(),
-    refresh:    this._refreshCounter(),
+    params: this._serverSideParams(),
+    refresh: this._refreshCounter(),
   }));
 
   // ---- loading + HTTP response ----
@@ -94,9 +96,9 @@ export class DemoTablePageComponent {
           return EMPTY;
         }
         this.isLoading.set(true);
-        return this._http.get<TasksResponse>('/api/tasks', { params }).pipe(
-          tap(() => this.isLoading.set(false)),
-        );
+        return this._http
+          .get<TasksResponse>('/api/tasks', { params })
+          .pipe(tap(() => this.isLoading.set(false)));
       }),
     ),
     { initialValue: { data: [] as Task[], total: 0 } },
@@ -106,12 +108,12 @@ export class DemoTablePageComponent {
 
   /** full dataset in client-side mode; current page slice returned by the API in server-side mode */
   readonly effectiveDataSource = computed<Task[]>(() =>
-    this.isClientSide() ? TASKS : (this._serverResponse()?.data ?? [])
+    this.isClientSide() ? TASKS : (this._serverResponse()?.data ?? []),
   );
 
   /** ignored by the table in client-side mode (it counts rows itself) */
   readonly effectiveLength = computed(() =>
-    this.isClientSide() ? 0 : (this._serverResponse()?.total ?? 0)
+    this.isClientSide() ? 0 : (this._serverResponse()?.total ?? 0),
   );
 
   // ---- selection state ----
@@ -141,7 +143,7 @@ export class DemoTablePageComponent {
 
   onRefresh(): void {
     this._pageIndex.set(0);
-    this._refreshCounter.update(n => n + 1);
+    this._refreshCounter.update((n) => n + 1);
   }
 
   onColumnOrderChange(order: string[]): void {

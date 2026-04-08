@@ -24,7 +24,7 @@
       <span>Filter: {{ column().label ?? column().key }}</span>
     </div>
 
-    @if (column().filterType === FilterType.DropDown) {
+    @if ((column().filterType ?? FilterType.DropDown) === FilterType.DropDown) {
       <div class="filter-sort-select">
         <button mat-button type="button" class="select-all-btn" (click)="selectAll()">
           Select All
