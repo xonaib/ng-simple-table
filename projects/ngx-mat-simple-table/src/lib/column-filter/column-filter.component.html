@@ -1,0 +1,87 @@
+<button
+  class="filter-toggle"
+  #toggleButton
+  type="button"
+  [class.filter-active]="isFilterActive()"
+  [class.menu-open]="isMenuOpen()"
+  (click)="toggleMenu()"
+  [attr.aria-label]="'Filter ' + (column().label ?? column().key)"
+  [attr.aria-expanded]="isMenuOpen()"
+>
+  <mat-icon>filter_list</mat-icon>
+</button>
+
+@if (isMenuOpen()) {
+  <div
+    class="filter-popup"
+    #filterMenu
+    role="dialog"
+    [attr.aria-label]="'Filter options for ' + (column().label ?? column().key)"
+    [style.top]="popupStyle().top"
+    [style.left]="popupStyle().left"
+  >
+    <div class="filter-header">
+      <span>Filter: {{ column().label ?? column().key }}</span>
+    </div>
+
+    @if ((column().filterType ?? FilterType.DropDown) === FilterType.DropDown) {
+      <div class="filter-sort-select">
+        <button mat-button type="button" class="select-all-btn" (click)="selectAll()">
+          Select All
+        </button>
+        <div class="sort-buttons">
+          <button
+            mat-icon-button
+            type="button"
+            [class.sorted]="sortDirection() === 'asc'"
+            (click)="setSortDirection('asc')"
+            aria-label="Sort ascending"
+          >
+            <mat-icon>arrow_upward</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            type="button"
+            [class.sorted]="sortDirection() === 'desc'"
+            (click)="setSortDirection('desc')"
+            aria-label="Sort descending"
+          >
+            <mat-icon>arrow_downward</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="filter-search-container">
+        <div class="filter-search-bar">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input
+            type="text"
+            placeholder="Search"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="searchTerm.set($event)"
+            aria-label="Search filter options"
+          />
+        </div>
+      </div>
+
+      <div class="filter-list-scroll">
+        <ul class="filter-list">
+          @for (item of filteredItems(); track item.id) {
+            <li>
+              <mat-checkbox [checked]="isSelected(item.id)" (change)="toggleItem(item.id)">{{
+                item.value
+              }}</mat-checkbox>
+            </li>
+          } @empty {
+            <li class="no-results">No options found</li>
+          }
+        </ul>
+      </div>
+
+      <div class="filter-footer">
+        <button mat-flat-button type="button" (click)="applyFilter()">Apply</button>
+        <button mat-stroked-button type="button" (click)="clearFilter()">Clear</button>
+      </div>
+    }
+  </div>
+}

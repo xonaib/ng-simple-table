@@ -209,7 +209,14 @@ Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-contain
 
 - Inline row editing (`isEditable` on `ColumnDef`, `editDef` content directive, `rowSave`/`rowCancel` outputs) — keeping editor out of the grid scope until unavoidable
 - Virtual scrolling (`CdkVirtualScrollViewport`) for large datasets
-- `ng-packagr` library build — publish to npm
 - Storybook stories per feature
 - Unit test suite (Vitest + Angular Testing Library)
 - StackBlitz live demo embed in README
+
+---
+
+## Published ✅
+
+- [x] `ng-packagr` library build — multi-project workspace under `projects/ngx-mat-simple-table/`
+- [x] Published to npm as [`ngx-mat-simple-table@1.0.0`](https://www.npmjs.com/package/ngx-mat-simple-table)
+- [x] Tagged `v1.0.0` on GitHub

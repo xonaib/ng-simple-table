@@ -5,8 +5,11 @@
     "ng": "ng",
     "start": "ng serve --open --port 4200",
     "build": "ng build",
+    "build:lib": "ng build ngx-mat-simple-table",
+    "build:lib:watch": "ng build ngx-mat-simple-table --watch",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "publish:lib": "npm run build:lib && npm publish dist/ngx-mat-simple-table --access public"
   },
   "private": true,
   "packageManager": "npm@11.11.0",
@@ -28,6 +31,7 @@
     "@angular/cli": "^21.2.3",
     "@angular/compiler-cli": "^21.2.0",
     "jsdom": "^28.0.0",
+    "ng-packagr": "^21.2.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"

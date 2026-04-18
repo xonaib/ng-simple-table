@@ -7,12 +7,18 @@
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
+    "paths": {
+      "ngx-mat-simple-table": [
+        "./dist/ngx-mat-simple-table"
+      ]
+    },
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
+    "lib": ["ES2022", "dom"],
     "module": "preserve"
   },
   "angularCompilerOptions": {
@@ -28,6 +34,12 @@
     },
     {
       "path": "./tsconfig.spec.json"
+    },
+    {
+      "path": "./projects/ngx-mat-simple-table/tsconfig.lib.json"
+    },
+    {
+      "path": "./projects/ngx-mat-simple-table/tsconfig.spec.json"
     }
   ]
 }

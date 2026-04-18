@@ -7,9 +7,7 @@ import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { SimpleTableComponent } from '../simple-table/simple-table.component';
-import { CellDefDirective } from '../simple-table/cell-def.directive';
-import { ColumnDef, FilterType, ItemParent, TableConfig } from '../simple-table/table.types';
+import { SimpleTableComponent, CellDefDirective, ColumnDef, FilterType, ItemParent, TableConfig } from 'ngx-mat-simple-table';
 import { Task, TASKS } from './demo-data';
 import { TasksResponse } from './tasks.interceptor';
 

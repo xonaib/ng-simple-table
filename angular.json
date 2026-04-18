@@ -76,6 +76,32 @@
           "builder": "@angular/build:unit-test"
         }
       }
+    },
+    "ngx-mat-simple-table": {
+      "projectType": "library",
+      "root": "projects/ngx-mat-simple-table",
+      "sourceRoot": "projects/ngx-mat-simple-table/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:ng-packagr",
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/ngx-mat-simple-table/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/ngx-mat-simple-table/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/ngx-mat-simple-table/tsconfig.spec.json"
+          }
+        }
+      }
     }
   }
 }
