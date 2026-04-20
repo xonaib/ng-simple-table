@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm run build:lib && npm install && npm run build",
+  "outputDirectory": "dist/Demo-table/browser",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
