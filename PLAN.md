@@ -58,7 +58,7 @@ from decorator-based API to Angular 17+ signal primitives.
 
 ---
 
-## V2 — In Progress
+## V2 — Complete ✅
 
 ### Client-Side Data Mode ✅
 
@@ -86,7 +86,7 @@ intercepted in-process — no backend required.
 
 ---
 
-### Column Chooser
+### Column Chooser ✅
 
 Allow users to show or hide columns at runtime via a panel inside the table header area.
 
@@ -99,7 +99,7 @@ Allow users to show or hide columns at runtime via a panel inside the table head
 
 ---
 
-### User Settings Persistence
+### User Settings Persistence ✅
 
 Remember per-user table configuration (visible columns, column widths, column order) across
 sessions. The storage backend is controlled by a flag so the host chooses where state lives.
@@ -144,26 +144,7 @@ interface TableUserSettings {
 
 ---
 
-### Nested / Expandable Rows
-
-- `expandDef` content directive (mirrors `cellDef`) for the expansion panel template
-- `expand` built-in column (`columnDef: 'expand'`) — chevron toggle
-- Expanded row IDs tracked in `signal<Set<unknown>>()`
-- Second `*matRowDef` in template renders full-width expansion panel via `NgTemplateOutlet`
-- Recursive by default — host can nest `<simple-table>` inside the expansion template
-
----
-
-### Drag & Drop Row Reordering
-
-- `reorderable` input (default `false`)
-- `cdkDropList` on `<tbody>`, `cdkDrag` on each `<tr mat-row>` (Angular CDK — no extra packages)
-- `drag` built-in column for the drag handle (`cdkDragHandle`)
-- `rowReorder` output emits `{ previousIndex, currentIndex, data: T[] }`
-
----
-
-### Theming & Style Customisation
+### Theming & Style Customisation ✅
 
 - Expose `--st-*` CSS custom properties for row height, header background, border colour, selected-row highlight, hover colour, scrollbar colours
 - `TableConfig.maxHeight?: string` — fixed-height scrollable body with sticky header
@@ -172,7 +153,7 @@ interface TableUserSettings {
 
 ---
 
-### Sticky / Fixed Columns
+### Sticky / Fixed Columns ✅
 
 Pin columns to the left or right edge so they remain visible when the table scrolls horizontally.
 Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-container matColumnDef>` natively — this feature wires that up declaratively via `ColumnDef`.
@@ -197,17 +178,18 @@ Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-contain
 
 ---
 
-### Other V2
+### Other V2 ✅
 
-- Date range column filter (`MatDatepicker`)
-- Server-side sort/filter/page model (`serverSide: boolean` flag)
-- Export to CSV utility
+- [x] Date range column filter (native date inputs, no extra deps)
+- [x] Export to CSV — toolbar button, browser download, `csvExport` output
 
 ---
 
 ## V3 — Future
 
 - Inline row editing (`isEditable` on `ColumnDef`, `editDef` content directive, `rowSave`/`rowCancel` outputs) — keeping editor out of the grid scope until unavoidable
+- Nested / Expandable Rows — `expandDef` directive, `expand` built-in column, signal-tracked expanded row IDs
+- Drag & Drop Row Reordering — CDK on `<tbody>`, `drag` built-in column, `rowReorder` output
 - Virtual scrolling (`CdkVirtualScrollViewport`) for large datasets
 - Storybook stories per feature
 - Unit test suite (Vitest + Angular Testing Library)
@@ -220,3 +202,4 @@ Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-contain
 - [x] `ng-packagr` library build — multi-project workspace under `projects/ngx-mat-simple-table/`
 - [x] Published to npm as [`ngx-mat-simple-table@1.0.0`](https://www.npmjs.com/package/ngx-mat-simple-table)
 - [x] Tagged `v1.0.0` on GitHub
+- [x] Published `ngx-mat-simple-table@2.0.0` — full V2 feature set

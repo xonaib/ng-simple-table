@@ -17,6 +17,16 @@ export interface ColumnDef {
   filterType?: FilterType;
   /** reserved for future column reordering (v2) */
   displayIndex?: number;
+  /**
+   * Pin column to the left or right edge during horizontal scroll.
+   * 'left' maps to Material's [sticky]="true", 'right' maps to [stickyEnd]="true".
+   */
+  sticky?: 'left' | 'right';
+  /**
+   * When false, the column cannot be hidden via the column chooser.
+   * Defaults to true. Sticky columns default to false.
+   */
+  hideable?: boolean;
 }
 
 /** Reserved column `key` for the internal layout filler — do not use in host configs. */
@@ -40,6 +50,14 @@ export interface TableConfig {
   columnDraggable?: boolean;
   /** Set false to disable column width resize handles. Default: on. */
   columnResizable?: boolean;
+  /**
+   * Enable horizontal scroll on the table wrapper.
+   * Auto-enabled when any column has sticky: 'left' | 'right', but can be
+   * forced independently for tables with many columns.
+   */
+  horizontalScroll?: boolean;
+  /** Fixed height for the table body with sticky header. Any valid CSS height value. */
+  maxHeight?: string;
 }
 
 export interface PaginationOptions {
@@ -48,7 +66,8 @@ export interface PaginationOptions {
 }
 
 export enum FilterType {
-  DropDown = 'DropDown',
+  DropDown  = 'DropDown',
+  DateRange = 'DateRange',
 }
 
 export interface Item {
@@ -65,4 +84,14 @@ export interface ItemParent {
 
 export interface ColumnFiltersData {
   parents: ItemParent[];
+}
+
+/** Persisted per-user table preferences managed by StStateStoringDirective. */
+export interface TableUserSettings {
+  /** Ordered list of column keys (excludes 'select'). */
+  columnOrder:   string[];
+  /** Column keys currently hidden by the column chooser. */
+  hiddenColumns: string[];
+  /** Column key → width in px from user resize interactions. */
+  columnWidths:  Record<string, number>;
 }

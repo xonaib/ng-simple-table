@@ -35,10 +35,14 @@ export class ColumnFilterComponent {
 
   readonly FilterType = FilterType;
 
-  readonly isMenuOpen = signal(false);
-  readonly searchTerm = signal('');
+  readonly isMenuOpen    = signal(false);
+  readonly searchTerm    = signal('');
   readonly sortDirection = signal<'asc' | 'desc' | null>(null);
-  readonly popupStyle = signal({ top: '0px', left: '0px' });
+  readonly popupStyle    = signal({ top: '0px', left: '0px' });
+
+  // date range pending state
+  readonly _pendingDateStart = signal<string>('');
+  readonly _pendingDateEnd   = signal<string>('');
 
   private readonly _pendingKeys = signal<ReadonlySet<number | string>>(new Set());
 
@@ -56,6 +60,11 @@ export class ColumnFilterComponent {
   });
 
   readonly isFilterActive = computed(() => (this.filter()?.selectedKeys?.length ?? 0) > 0);
+
+  readonly isDateRangeFilterActive = computed(() => {
+    const keys = this.filter()?.selectedKeys ?? [];
+    return keys.length > 0 && keys.some(k => !!k);
+  });
 
   @HostListener('document:click', ['$event.target'])
   onDocumentClick(target: EventTarget | null): void {
@@ -75,7 +84,13 @@ export class ColumnFilterComponent {
 
   toggleMenu(): void {
     if (!this.isMenuOpen()) {
-      this._pendingKeys.set(new Set(this.filter()?.selectedKeys ?? []));
+      const existing = this.filter()?.selectedKeys ?? [];
+      if (this.column().filterType === FilterType.DateRange) {
+        this._pendingDateStart.set(existing[0] ? String(existing[0]) : '');
+        this._pendingDateEnd.set(existing[1]   ? String(existing[1]) : '');
+      } else {
+        this._pendingKeys.set(new Set(existing));
+      }
       const rect = this.toggleButton()!.nativeElement.getBoundingClientRect();
       this.popupStyle.set({ top: `${rect.bottom + 4}px`, left: `${rect.left}px` });
     }
@@ -106,13 +121,24 @@ export class ColumnFilterComponent {
 
   applyFilter(): void {
     const f = this.filter();
-    if (!f) return;
-    this.filterApplied.emit({ ...f, selectedKeys: [...this._pendingKeys()] });
+    if (this.column().filterType === FilterType.DateRange) {
+      const start = this._pendingDateStart();
+      const end   = this._pendingDateEnd();
+      this.filterApplied.emit({
+        id: this.column().key,
+        selectedKeys: [start, end].filter(v => !!v),
+      });
+    } else {
+      if (!f) return;
+      this.filterApplied.emit({ ...f, selectedKeys: [...this._pendingKeys()] });
+    }
     this.isMenuOpen.set(false);
   }
 
   clearFilter(): void {
     this._pendingKeys.set(new Set());
+    this._pendingDateStart.set('');
+    this._pendingDateEnd.set('');
     this.filterCleared.emit(this.column().key);
     this.isMenuOpen.set(false);
   }

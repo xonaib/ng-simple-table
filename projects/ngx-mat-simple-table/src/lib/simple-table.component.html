@@ -42,6 +42,11 @@
         </div>
       </mat-menu>
     }
+    @if (_showExport()) {
+      <button mat-icon-button (click)="exportData()" aria-label="Export data">
+        <mat-icon>download</mat-icon>
+      </button>
+    }
     @if (_showRefresh()) {
       <button mat-icon-button (click)="refresh.emit()" aria-label="Refresh data">
         <mat-icon>refresh</mat-icon>
@@ -50,6 +55,12 @@
   </div>
 }
 
+<div
+  class="st-table-wrapper"
+  [class.st-horizontal-scroll]="_hasHorizontalScroll()"
+  [style.max-height]="_maxHeight()"
+  [class.st-has-max-height]="!!_maxHeight()"
+>
 <table
   class="simple-table"
   [class.resizable]="_isResizable()"
@@ -61,7 +72,7 @@
   cdkDropListGroup
 >
   <!-- checkbox column — always locked, not draggable or resizable -->
-  <ng-container matColumnDef="select">
+  <ng-container matColumnDef="select" [sticky]="true">
     <th mat-header-cell *matHeaderCellDef [style.width]="effectiveWidthStyleForSelect()">
       <mat-checkbox
         (change)="$event ? masterToggle() : null"
@@ -87,7 +98,12 @@
        cdkDropList must live on <th> while cdkDrag wraps the cell contents: putting both on the
        same element makes previousContainer === container on every drop, so _columnOrder never
        updates and body columns stay out of sync with the header. -->
-  <ng-container *ngFor="let column of _allDataColumns()" [matColumnDef]="column.key">
+  <ng-container
+    *ngFor="let column of _allDataColumns()"
+    [matColumnDef]="column.key"
+    [sticky]="column.sticky === 'left'"
+    [stickyEnd]="column.sticky === 'right'"
+  >
     <th
       mat-header-cell
       *matHeaderCellDef
@@ -185,6 +201,7 @@
     (click)="selection.toggle(row)"
   ></tr>
 </table>
+</div>
 
 @if (tableConfig().isPaginated) {
   <mat-paginator

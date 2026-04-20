@@ -1,7 +1,69 @@
+/**
+ * CSS custom properties for theming ngx-mat-simple-table.
+ * Override any of these on the <simple-table> element or a parent selector.
+ *
+ * --st-header-bg          Header row background colour
+ * --st-header-color       Header row text colour
+ * --st-border-color       Cell border colour
+ * --st-row-hover-bg       Row background on hover
+ * --st-row-selected-bg    Selected row background
+ * --st-row-height         Row height (min-height)
+ * --st-font-size          Cell font size
+ * --st-toolbar-bg         Toolbar background colour
+ * --st-scrollbar-width    Scrollbar width (thin | auto | none)
+ * --st-scrollbar-thumb    Scrollbar thumb colour
+ * --st-scrollbar-track    Scrollbar track colour
+ */
+
 :host {
   display: block;
   width: 100%;
-  overflow-x: auto;
+
+  // ---- default token values (alias Material system tokens) ----
+  --st-header-bg:         var(--mat-sys-surface-variant);
+  --st-header-color:      var(--mat-sys-on-surface-variant);
+  --st-border-color:      var(--mat-sys-outline-variant);
+  --st-row-hover-bg:      var(--mat-sys-surface-container-low);
+  --st-row-selected-bg:   var(--mat-sys-secondary-container);
+  --st-row-height:        48px;
+  --st-font-size:         14px;
+  --st-toolbar-bg:        var(--mat-sys-surface);
+  --st-scrollbar-width:   thin;
+  --st-scrollbar-thumb:   var(--mat-sys-outline);
+  --st-scrollbar-track:   transparent;
+}
+
+// ---- table wrapper (handles horizontal scroll and maxHeight) ----
+
+.st-table-wrapper {
+  width: 100%;
+
+  &.st-horizontal-scroll {
+    overflow-x: auto;
+  }
+
+  &.st-has-max-height {
+    overflow-y: auto;
+  }
+}
+
+// ---- table wrapper scrollbar styling ----
+
+.st-table-wrapper {
+  scrollbar-width: var(--st-scrollbar-width);
+  scrollbar-color: var(--st-scrollbar-thumb) var(--st-scrollbar-track);
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--st-scrollbar-thumb);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-track {
+    background: var(--st-scrollbar-track);
+  }
 }
 
 // ---- toolbar ----
@@ -11,8 +73,8 @@
   justify-content: flex-end;
   align-items: center;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-  background: var(--mat-sys-surface);
+  border-bottom: 1px solid var(--st-border-color);
+  background: var(--st-toolbar-bg);
 }
 
 // ---- column chooser (menu content stays in this component’s template) ----
@@ -74,8 +136,9 @@
   // ---- header ----
 
   th.mat-mdc-header-cell {
-    background-color: var(--mat-sys-surface-variant);
-    border-bottom: 2px solid var(--mat-sys-outline-variant);
+    background-color: var(--st-header-bg);
+    color: var(--st-header-color);
+    border-bottom: 2px solid var(--st-border-color);
     padding: var(--st-cell-pad-y) var(--st-cell-pad-x);
     position: relative;
     white-space: nowrap;
@@ -158,7 +221,7 @@
       bottom: 20%;
       width: 2px;
       border-radius: 1px;
-      background: var(--mat-sys-outline-variant);
+      background: var(--st-border-color);
       opacity: 0;
       transition: opacity 0.15s;
     }
@@ -179,9 +242,9 @@
   // ---- cells ----
 
   td.mat-mdc-cell {
-    font-size: 14px;
+    font-size: var(--st-font-size);
     color: var(--mat-sys-on-surface);
-    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    border-bottom: 1px solid var(--st-border-color);
     padding: var(--st-cell-pad-y) var(--st-cell-pad-x);
   }
 
@@ -190,13 +253,14 @@
   tr.mat-mdc-row {
     cursor: pointer;
     transition: background-color 0.15s ease;
+    min-height: var(--st-row-height);
 
     &:hover {
-      background-color: var(--mat-sys-surface-container-low);
+      background-color: var(--st-row-hover-bg);
     }
 
     &.selected-row {
-      background-color: var(--mat-sys-secondary-container);
+      background-color: var(--st-row-selected-bg);
     }
   }
 
@@ -229,6 +293,6 @@
 // ---- paginator ----
 
 mat-paginator {
-  border-top: 1px solid var(--mat-sys-outline-variant);
+  border-top: 1px solid var(--st-border-color);
 }
 

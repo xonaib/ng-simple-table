@@ -83,5 +83,33 @@
         <button mat-stroked-button type="button" (click)="clearFilter()">Clear</button>
       </div>
     }
+
+    @if ((column().filterType) === FilterType.DateRange) {
+      <div class="filter-date-range">
+        <div class="filter-date-field">
+          <label>From</label>
+          <input
+            type="date"
+            [ngModel]="_pendingDateStart()"
+            (ngModelChange)="_pendingDateStart.set($event)"
+            aria-label="Start date"
+          />
+        </div>
+        <div class="filter-date-field">
+          <label>To</label>
+          <input
+            type="date"
+            [ngModel]="_pendingDateEnd()"
+            (ngModelChange)="_pendingDateEnd.set($event)"
+            [min]="_pendingDateStart()"
+            aria-label="End date"
+          />
+        </div>
+      </div>
+      <div class="filter-footer">
+        <button mat-flat-button type="button" (click)="applyFilter()">Apply</button>
+        <button mat-stroked-button type="button" (click)="clearFilter()">Clear</button>
+      </div>
+    }
   </div>
 }

@@ -42,6 +42,7 @@
   ></mat-progress-bar>
 
   <simple-table
+    tableId="demo-tasks-table"
     [dataSource]="effectiveDataSource()"
     [tableColumns]="columns"
     [tableConfig]="effectiveConfig()"
@@ -55,6 +56,9 @@
     (columnOrderChange)="onColumnOrderChange($event)"
     (columnWidthChange)="onColumnWidthChange($event)"
   >
+    <st-state-storing />
+    <st-export />
+
     <!-- custom cell template for the title column — the header is auto-generated
          inside simple-table so mat-sort-header works on all columns uniformly -->
     <ng-template cellDef="title" let-row>

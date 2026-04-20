@@ -7,14 +7,14 @@ import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { SimpleTableComponent, CellDefDirective, ColumnDef, FilterType, ItemParent, TableConfig } from 'ngx-mat-simple-table';
+import { SimpleTableComponent, CellDefDirective, StStateStoringDirective, StExportDirective, ColumnDef, FilterType, ItemParent, TableConfig } from 'ngx-mat-simple-table';
 import { Task, TASKS } from './demo-data';
 import { TasksResponse } from './tasks.interceptor';
 
 @Component({
   selector: 'app-demo-table-page',
   standalone: true,
-  imports: [SimpleTableComponent, CellDefDirective, MatButtonToggleModule, MatProgressBarModule],
+  imports: [SimpleTableComponent, CellDefDirective, StStateStoringDirective, StExportDirective, MatButtonToggleModule, MatProgressBarModule],
   templateUrl: './demo-table-page.component.html',
   styleUrl: './demo-table-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
