@@ -1,6 +1,6 @@
 {
   "name": "ngx-mat-simple-table",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "A reusable, declarative Angular Material table component built with Angular signals",
   "keywords": [
     "angular",
