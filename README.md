@@ -192,6 +192,12 @@ Opens `http://localhost:4200` — task table with server/client toggle, filters,
 
 MIT
 
+## Blog Post
+
+[I got tired of copy-pasting the same Angular Material table setup, so I built a library](https://dev.to/zonaibbokhari/i-got-tired-of-copy-pasting-the-same-table-code-so-i-built-a-library-434k) — covers the build process, decisions, and what broke along the way.
+
+---
+
 ## References
 
 Similar “dynamic Material table” ideas (for comparison, not dependencies):
