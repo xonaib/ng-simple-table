@@ -4,15 +4,13 @@
   "compileOnSave": false,
   "compilerOptions": {
     "strict": true,
+    "paths": {
+      "ngx-mat-simple-table": ["./dist/ngx-mat-simple-table"]
+    },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
-    "paths": {
-      "ngx-mat-simple-table": [
-        "./dist/ngx-mat-simple-table"
-      ]
-    },
-    "noFallthroughCasesInSwitch": true,
+"noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "experimentalDecorators": true,

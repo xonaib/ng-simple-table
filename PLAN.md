@@ -178,10 +178,48 @@ Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-contain
 
 ---
 
+### Column Drag-Reorder ✅
+
+Reorder columns at runtime by dragging header cells left and right.
+
+- CDK `CdkDrag` / `CdkDropList` / `CdkDropListGroup` on header cells — each `<th>` is simultaneously a `CdkDropList` and a `CdkDrag`; the `<table>` carries `cdkDropListGroup` to auto-connect all headers
+- `*ngFor` (not `@for`) required on data column `<ng-container>` blocks so CDK can traverse the view tree
+- Filter and resize-handle elements stop `pointerdown` propagation to avoid triggering a drag unintentionally
+- Custom `cdkDragPreview` and `cdkDragPlaceholder` templates prevent the default clone from losing Angular encapsulation styles when portalled to `<body>`
+- `_columnOrder` signal drives `_headers()` computed; `columnOrderChange` output emits the new key order whenever a drop completes
+- Column chooser panel also supports drag-to-reorder via a vertical `CdkDropList`
+- `TableConfig.columnDraggable?: boolean` (default `true`) — set to `false` to disable
+- `TableConfig.columnResizable?: boolean` (default `true`) — set to `false` to disable resize handles
+
+---
+
+### Export to Excel (XLSX) ✅
+
+- `StExportDirective` (`<st-export>`) — content child directive on `<simple-table>`; accepts `filename`, `format` (`'xlsx'` | `'csv'`), and `allDataProvider` inputs
+- `SimpleTableExportService` — dedicated `@Injectable({ providedIn: 'root' })` service; all export logic extracted here to keep the component lean and tree-shake the dependency when `<st-export>` is never used
+- ExcelJS (MIT) used for XLSX — supports full cell styling, unlike SheetJS community edition
+- Header row styled to match the rendered grid header: reads `backgroundColor`, `color`, and `fontWeight` from the first `th.mat-mdc-header-cell` via `getComputedStyle`; converts CSS `rgb()`/`rgba()` to ExcelJS ARGB format
+- Dates pre-formatted as `DD/MM/YYYY` strings before writing to avoid Excel serial-number display and locale/timezone ambiguity
+- Export respects `ColumnDef.exportValue` (export-only override) → `ColumnDef.displayValue` (shared with grid) → raw value priority chain
+- **Export all records** — not just the current page:
+  - Client-side mode: exports `MatTableDataSource.filteredData` (all filtered rows across all pages)
+  - Server-side mode: `allDataProvider` callback on `<st-export>` fetches all records unpaginated; `TasksInterceptor` returns all when no `size` param is present; falls back to current page with a console warning if no provider is set
+- Falls back to CSV automatically if ExcelJS is not installed
+
+---
+
+### `displayValue` as single source of truth ✅
+
+- `ColumnDef.displayValue?: (value, row) => unknown` — transform applied in both the grid's default cell renderer and during export; define formatting once, works everywhere without a custom `cellDef` template
+- `ColumnDef.exportValue?: (value, row) => unknown` — export-only override for when the grid needs rich rendering (badge, icon, link) but the export needs plain text
+- Priority: `exportValue` → `displayValue` → raw value
+
+---
+
 ### Other V2 ✅
 
 - [x] Date range column filter (native date inputs, no extra deps)
-- [x] Export to CSV — toolbar button, browser download, `csvExport` output
+- [x] Export to CSV — toolbar button, browser download
 
 ---
 
@@ -203,3 +241,4 @@ Angular Material's `mat-table` supports `sticky` and `stickyEnd` on `<ng-contain
 - [x] Published to npm as [`ngx-mat-simple-table@1.0.0`](https://www.npmjs.com/package/ngx-mat-simple-table)
 - [x] Tagged `v1.0.0` on GitHub
 - [x] Published `ngx-mat-simple-table@2.0.0` — full V2 feature set
+- [ ] Publish `ngx-mat-simple-table@2.0.1` — export service extraction, `displayValue` shared transform, XLSX header styling, export-all-records support

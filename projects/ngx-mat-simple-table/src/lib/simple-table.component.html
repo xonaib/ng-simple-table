@@ -182,7 +182,7 @@
           [ngTemplateOutletContext]="{ $implicit: row }"
         ></ng-container>
       } @else {
-        {{ row[column.key] }}
+        {{ column.displayValue ? column.displayValue(row[column.key], row) : row[column.key] }}
       }
     </td>
   </ng-container>

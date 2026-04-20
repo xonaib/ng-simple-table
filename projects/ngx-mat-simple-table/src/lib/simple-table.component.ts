@@ -40,6 +40,7 @@ import { Observable, isObservable, of as observableOf } from 'rxjs';
 import { ColumnFilterComponent } from './column-filter/column-filter.component';
 import { CellDefDirective } from './cell-def.directive';
 import { StExportDirective } from './st-export.directive';
+import { SimpleTableExportService } from './simple-table-export.service';
 import {
   ColumnDef,
   FilterType,
@@ -80,8 +81,9 @@ const ST_SELECT_DEFAULT_SUM_PX = 52;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SimpleTableComponent<T> implements AfterContentInit {
-  private readonly _destroyRef = inject(DestroyRef);
-  private readonly _hostEl = inject(ElementRef<HTMLElement>);
+  private readonly _destroyRef  = inject(DestroyRef);
+  private readonly _hostEl      = inject(ElementRef<HTMLElement>);
+  private readonly _exportSvc   = inject(SimpleTableExportService);
 
   /** `matColumnDef` id for the internal filler column (template + row defs only). */
   readonly layoutFillerColumnDef = SIMPLE_TABLE_LAYOUT_FILLER_COLUMN;
@@ -90,7 +92,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly selection = new SelectionModel<T>(true, []);
 
   // ---- view children (used for client-side mode) ----
-  private readonly _sortRef      = viewChild(MatSort);
+  private readonly _sortRef = viewChild(MatSort);
   private readonly _paginatorRef = viewChild(MatPaginator);
 
   /** custom cell templates provided by the host via [cellDef] */
@@ -148,7 +150,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * reset Material Table's internal state and break data-row updates when _headers() changes.
    */
   readonly _allDataColumns = computed(() =>
-    this.tableColumns().filter(col => col.key !== 'select')
+    this.tableColumns().filter((col) => col.key !== 'select'),
   );
 
   /**
@@ -248,20 +250,22 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   // ---- toolbar visibility (opt-out: undefined = on, false = off) ----
 
   readonly _showColumnChooser = computed(() => this.tableConfig().showColumnChooser !== false);
-  readonly _showRefresh       = computed(() => this.tableConfig().showRefresh       !== false);
-  readonly _showExport        = computed(() => !!this._exportDirective());
-  readonly _hasToolbar        = computed(() => this._showColumnChooser() || this._showRefresh() || this._showExport());
+  readonly _showRefresh = computed(() => this.tableConfig().showRefresh !== false);
+  readonly _showExport = computed(() => !!this._exportDirective());
+  readonly _hasToolbar = computed(
+    () => this._showColumnChooser() || this._showRefresh() || this._showExport(),
+  );
 
   // ---- drag / resize feature flags (opt-out) ----
 
   readonly _isDraggable = computed(() => this.tableConfig().columnDraggable !== false);
-  readonly _isResizable = computed(() => this.tableConfig().columnResizable  !== false);
+  readonly _isResizable = computed(() => this.tableConfig().columnResizable !== false);
 
   // ---- sticky / scroll ----
 
   readonly _hasHorizontalScroll = computed(() => {
     if (this.tableConfig().horizontalScroll) return true;
-    return this.tableColumns().some(c => c.sticky === 'left' || c.sticky === 'right');
+    return this.tableColumns().some((c) => c.sticky === 'left' || c.sticky === 'right');
   });
 
   readonly _maxHeight = computed(() => this.tableConfig().maxHeight ?? null);
@@ -317,21 +321,21 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     });
 
     this._matDs.filterPredicate = (row: T) => {
-      const filters  = this.columnFilters();
-      const colDefs  = this.tableColumns();
+      const filters = this.columnFilters();
+      const colDefs = this.tableColumns();
       for (const [col, parent] of filters) {
         const keys = parent.selectedKeys ?? [];
         if (keys.length === 0) continue;
-        const colDef = colDefs.find(c => c.key === col);
+        const colDef = colDefs.find((c) => c.key === col);
         if (colDef?.filterType === FilterType.DateRange) {
           // keys[0] = start ISO string, keys[1] = end ISO string
           const cellVal = (row as Record<string, unknown>)[col];
           const cellDate = cellVal ? new Date(String(cellVal)).getTime() : NaN;
           if (isNaN(cellDate)) return false;
           const start = keys[0] ? new Date(String(keys[0])).getTime() : null;
-          const end   = keys[1] ? new Date(String(keys[1])).getTime() : null;
+          const end = keys[1] ? new Date(String(keys[1])).getTime() : null;
           if (start !== null && cellDate < start) return false;
-          if (end   !== null && cellDate > end)   return false;
+          if (end !== null && cellDate > end) return false;
         } else {
           const keySet = new Set(keys.map((k) => String(k)));
           if (!keySet.has(String((row as Record<string, unknown>)[col]))) return false;
@@ -377,8 +381,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     // Initialise display order from the host-provided column list
     this._columnOrder.set(
       this.tableColumns()
-        .filter(col => col.key !== 'select')
-        .map(col => col.key),
+        .filter((col) => col.key !== 'select')
+        .map((col) => col.key),
     );
   }
 
@@ -508,186 +512,48 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   /** Exports visible columns and all data, triggers a browser download, and emits via dataExport. */
   exportData(): void {
     const visibleKeys = this._headers().filter(
-      k => k !== 'select' && k !== SIMPLE_TABLE_LAYOUT_FILLER_COLUMN
+      (k) => k !== 'select' && k !== SIMPLE_TABLE_LAYOUT_FILLER_COLUMN,
     );
-    // Preserve visible display order by mapping from visibleKeys, not tableColumns order
-    const colMap = new Map(this.tableColumns().map(c => [c.key, c]));
-    const cols      = visibleKeys.map(k => colMap.get(k)).filter((c): c is ColumnDef => !!c);
+    const colMap    = new Map(this.tableColumns().map((c) => [c.key, c]));
+    const cols      = visibleKeys.map((k) => colMap.get(k)).filter((c): c is ColumnDef => !!c);
     const directive = this._exportDirective();
     const name      = directive?.filename() ?? this.tableId() ?? 'export';
     const format    = directive?.format() ?? 'xlsx';
+    const hostEl    = this._hostEl.nativeElement as HTMLElement;
 
     const doExport = (rows: T[]) => {
-      if (format === 'xlsx') this._exportXlsx(cols, rows, name);
-      else                   this._exportCsv(cols, rows, name);
+      if (format === 'xlsx') {
+        this._exportSvc.exportXlsx(cols, rows as unknown[], name, hostEl)
+          .then(() => this.dataExport.emit(''))
+          .catch(() => {
+            console.warn(
+              '[ngx-mat-simple-table] xlsx export requires the "exceljs" package. ' +
+              'Install it: npm install exceljs. Falling back to CSV.',
+            );
+            this._exportSvc.exportCsv(cols, rows as unknown[], name);
+            this.dataExport.emit('');
+          });
+      } else {
+        this._exportSvc.exportCsv(cols, rows as unknown[], name);
+        this.dataExport.emit('');
+      }
     };
 
     if (this.tableConfig().clientSide) {
-      // Client-side: filteredData contains every matching row across all pages
       doExport(this._matDs.filteredData);
       return;
     }
 
-    // Server-side: the table only holds the current page — use allDataProvider to fetch everything
     const provider = directive?.allDataProvider();
     if (provider) {
-      provider().then(rows => doExport(rows as T[]));
+      provider().then((rows) => doExport(rows as T[]));
     } else {
       console.warn(
         '[ngx-mat-simple-table] Server-side export without allDataProvider — ' +
-        'exporting current page only. Add [allDataProvider] to <st-export> to export all records.'
+        'exporting current page only. Add [allDataProvider] to <st-export> to export all records.',
       );
       doExport(this._data());
     }
-  }
-
-  private _getCellValue(v: unknown): unknown {
-    if (v == null) return '';
-    // Return Date objects and ISO date strings as real Date so xlsx sets the correct cell type
-    if (v instanceof Date) return v;
-    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}(T|$)/.test(v)) {
-      const d = new Date(v);
-      if (!isNaN(d.getTime())) return d;
-    }
-    // Numeric ms timestamp → Date
-    if (typeof v === 'number' && v > 1_000_000_000_000) return new Date(v);
-    return v;
-  }
-
-  private _exportXlsx(cols: ColumnDef[], rows: T[], filename: string): void {
-    // Dynamic import keeps ExcelJS out of the initial bundle — loaded only when export is used.
-    import('exceljs').then(m => {
-      const wb = new m.Workbook();
-      const ws = wb.addWorksheet('Export');
-
-      // ---- read header styles from the rendered table header cell ----
-      const headerStyle = this._readHeaderStyle();
-
-      // ---- header row ----
-      const headerRow = ws.addRow(cols.map(c => c.label ?? c.key));
-      headerRow.eachCell(cell => {
-        cell.font   = headerStyle.font   as import('exceljs').Font;
-        cell.fill   = headerStyle.fill;
-        cell.border = headerStyle.border as import('exceljs').Borders;
-      });
-
-      // ---- data rows ----
-      const pad = (n: number) => String(n).padStart(2, '0');
-      for (const row of rows) {
-        const values = cols.map(c => {
-          const v = this._getCellValue((row as Record<string, unknown>)[c.key]);
-          if (v instanceof Date && !isNaN(v.getTime())) {
-            // Format as DD/MM/YYYY string — avoids locale/timezone ambiguity in Excel
-            return `${pad(v.getDate())}/${pad(v.getMonth() + 1)}/${v.getFullYear()}`;
-          }
-          return v;
-        });
-        ws.addRow(values);
-      }
-
-      // ---- download ----
-      wb.xlsx.writeBuffer().then((buffer: ArrayBuffer) => {
-        const blob = new Blob([buffer], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-        const a   = document.createElement('a');
-        a.href     = url;
-        a.download = `${filename}.xlsx`;
-        a.click();
-        URL.revokeObjectURL(url);
-        this.dataExport.emit('');
-      });
-    }).catch(() => {
-      console.warn('[ngx-mat-simple-table] xlsx export requires the "exceljs" package. ' +
-        'Install it: npm install exceljs. Falling back to CSV.');
-      this._exportCsv(cols, rows, filename);
-    });
-  }
-
-  /**
-   * Reads background colour, text colour, and font weight from the first rendered header cell
-   * and returns an ExcelJS-compatible style object. Falls back to a neutral grey if the header
-   * background is transparent or the DOM query fails.
-   */
-  private _readHeaderStyle(): {
-    font:   Partial<import('exceljs').Font>;
-    fill:   import('exceljs').Fill;
-    border: Partial<import('exceljs').Borders>;
-  } {
-    const fallbackArgb = 'FFEEEEEE';
-    const fallbackFg   = 'FF333333';
-    const fallbackFill: import('exceljs').Fill = {
-      type: 'pattern', pattern: 'solid', fgColor: { argb: fallbackArgb },
-    };
-
-    let bgArgb = fallbackArgb;
-    let fgArgb = fallbackFg;
-    let bold   = true;
-
-    try {
-      const el = (this._hostEl.nativeElement as HTMLElement)
-        .querySelector('th.mat-mdc-header-cell') as HTMLElement | null;
-      if (el) {
-        const cs = window.getComputedStyle(el);
-        bgArgb = this._cssColorToArgb(cs.backgroundColor) ?? fallbackArgb;
-        fgArgb = this._cssColorToArgb(cs.color) ?? fallbackFg;
-        bold   = parseInt(cs.fontWeight || '400') >= 600;
-      }
-    } catch { /* fall through to defaults */ }
-
-    return {
-      font:   { bold, color: { argb: fgArgb } },
-      fill:   bgArgb !== fallbackArgb
-                ? { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
-                : fallbackFill,
-      border: { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } },
-    };
-  }
-
-  /**
-   * Converts a CSS `rgb()`/`rgba()` string to an 8-char ARGB hex string (ExcelJS format).
-   * Returns undefined for fully-transparent or pure-white values (no meaningful fill).
-   */
-  private _cssColorToArgb(css: string): string | undefined {
-    const m = css.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (!m) return undefined;
-    const alpha = m[4] !== undefined ? parseFloat(m[4]) : 1;
-    if (alpha === 0) return undefined;
-    const aa  = Math.round(alpha * 255).toString(16).padStart(2, '0').toUpperCase();
-    const rgb = [m[1], m[2], m[3]]
-      .map(n => parseInt(n).toString(16).padStart(2, '0'))
-      .join('')
-      .toUpperCase();
-    return rgb === 'FFFFFF' ? undefined : `${aa}${rgb}`;
-  }
-
-  private _exportCsv(cols: ColumnDef[], rows: T[], filename: string): void {
-    const formatValue = (v: unknown): string => {
-      const resolved = this._getCellValue(v);
-      if (resolved instanceof Date) return resolved.toLocaleDateString();
-      return String(resolved ?? '');
-    };
-    const escape = (v: unknown): string => {
-      const s = formatValue(v);
-      return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? `"${s.replace(/"/g, '""')}"`
-        : s;
-    };
-    const header = cols.map(c => escape(c.label ?? c.key)).join(',');
-    const body   = rows.map(row =>
-      cols.map(c => escape((row as Record<string, unknown>)[c.key])).join(',')
-    );
-    const csv = [header, ...body].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${filename}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    this.dataExport.emit(csv);
   }
 
   /** Called by StStateStoringDirective to restore persisted user preferences on init. */
@@ -699,7 +565,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       this._hiddenColumns.set(new Set(settings.hiddenColumns));
     }
     if (settings.columnWidths && Object.keys(settings.columnWidths).length) {
-      this._columnWidths.set(new Map(Object.entries(settings.columnWidths).map(([k, v]) => [k, v])));
+      this._columnWidths.set(
+        new Map(Object.entries(settings.columnWidths).map(([k, v]) => [k, v])),
+      );
     }
   }
 
@@ -721,12 +589,12 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   onColumnDrop(event: CdkDragDrop<string>): void {
     const fromKey = String(event.item.data);
-    const toKey   = String(event.container.data);
+    const toKey = String(event.container.data);
     if (!fromKey || !toKey || fromKey === toKey) return;
 
     const order = [...this._columnOrder()];
-    const fi    = order.indexOf(fromKey);
-    const ti    = order.indexOf(toKey);
+    const fi = order.indexOf(fromKey);
+    const ti = order.indexOf(toKey);
     if (fi < 0 || ti < 0) return;
 
     moveItemInArray(order, fi, ti);
@@ -810,12 +678,12 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
     const onUp = (): void => {
       document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
+      document.removeEventListener('mouseup', onUp);
       this.columnWidthChange.emit(Object.fromEntries(this._columnWidths()));
     };
 
     document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
+    document.addEventListener('mouseup', onUp);
   }
 
   // ---- selection ----

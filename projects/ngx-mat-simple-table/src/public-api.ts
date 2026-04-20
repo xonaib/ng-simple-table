@@ -7,3 +7,4 @@ export * from './lib/cell-def.directive';
 export * from './lib/st-state-storing.directive';
 export * from './lib/st-export.directive';
 export * from './lib/table.types';
+export * from './lib/simple-table-export.service';

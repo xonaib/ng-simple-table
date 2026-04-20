@@ -27,6 +27,28 @@ export interface ColumnDef {
    * Defaults to true. Sticky columns default to false.
    */
   hideable?: boolean;
+  /**
+   * Optional transform applied to the cell value for **both** the grid's default cell renderer
+   * and export (xlsx / csv). Define formatting here once and it works everywhere — no need for
+   * a custom `cellDef` template just to apply a pipe.
+   *
+   * @param value  The raw value from the row (`row[key]`)
+   * @param row    The full row object, in case you need other fields for the display value
+   * @returns      The value to display in the grid cell and write to the export file
+   *
+   * @example
+   * { key: 'priority', displayValue: v => String(v).toUpperCase() }
+   * { key: 'status',   displayValue: v => String(v).replace(/-/g, ' ').toUpperCase() }
+   */
+  displayValue?: (value: unknown, row: unknown) => unknown;
+  /**
+   * Export-only override. When set, this is used **instead of** `displayValue` during export.
+   * Use when the grid needs rich rendering (badge, icon, link) but the export needs plain text.
+   *
+   * @example
+   * { key: 'title', displayValue: v => v, exportValue: v => String(v) }
+   */
+  exportValue?: (value: unknown, row: unknown) => unknown;
 }
 
 /** Reserved column `key` for the internal layout filler — do not use in host configs. */
