@@ -505,23 +505,39 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     this.cellDefs().forEach((d) => this.customCellTemplates.set(d.key(), d.template));
   }
 
-  /** Exports visible columns and current data, triggers a browser download, and emits via dataExport. */
+  /** Exports visible columns and all data, triggers a browser download, and emits via dataExport. */
   exportData(): void {
     const visibleKeys = this._headers().filter(
       k => k !== 'select' && k !== SIMPLE_TABLE_LAYOUT_FILLER_COLUMN
     );
     // Preserve visible display order by mapping from visibleKeys, not tableColumns order
     const colMap = new Map(this.tableColumns().map(c => [c.key, c]));
-    const cols   = visibleKeys.map(k => colMap.get(k)).filter((c): c is ColumnDef => !!c);
-    const rows   = this.tableConfig().clientSide ? this._matDs.filteredData : this._data();
+    const cols      = visibleKeys.map(k => colMap.get(k)).filter((c): c is ColumnDef => !!c);
     const directive = this._exportDirective();
-    const name   = directive?.filename() ?? this.tableId() ?? 'export';
-    const format = directive?.format() ?? 'xlsx';
+    const name      = directive?.filename() ?? this.tableId() ?? 'export';
+    const format    = directive?.format() ?? 'xlsx';
 
-    if (format === 'xlsx') {
-      this._exportXlsx(cols, rows, name);
+    const doExport = (rows: T[]) => {
+      if (format === 'xlsx') this._exportXlsx(cols, rows, name);
+      else                   this._exportCsv(cols, rows, name);
+    };
+
+    if (this.tableConfig().clientSide) {
+      // Client-side: filteredData contains every matching row across all pages
+      doExport(this._matDs.filteredData);
+      return;
+    }
+
+    // Server-side: the table only holds the current page — use allDataProvider to fetch everything
+    const provider = directive?.allDataProvider();
+    if (provider) {
+      provider().then(rows => doExport(rows as T[]));
     } else {
-      this._exportCsv(cols, rows, name);
+      console.warn(
+        '[ngx-mat-simple-table] Server-side export without allDataProvider — ' +
+        'exporting current page only. Add [allDataProvider] to <st-export> to export all records.'
+      );
+      doExport(this._data());
     }
   }
 
@@ -539,45 +555,111 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   }
 
   private _exportXlsx(cols: ColumnDef[], rows: T[], filename: string): void {
-    // Dynamic import so xlsx is only loaded when actually used (keeps initial bundle clean)
-    import('xlsx').then(XLSX => {
-      const headers = cols.map(c => c.label ?? c.key);
+    // Dynamic import keeps ExcelJS out of the initial bundle — loaded only when export is used.
+    import('exceljs').then(m => {
+      const wb = new m.Workbook();
+      const ws = wb.addWorksheet('Export');
 
-      // Build raw AOA first — Date objects survive as Date so the cell grid is easy to post-process
-      const resolvedRows = rows.map(row =>
-        cols.map(c => this._getCellValue((row as Record<string, unknown>)[c.key]))
-      );
-      const data: unknown[][] = [headers, ...resolvedRows];
+      // ---- read header styles from the rendered table header cell ----
+      const headerStyle = this._readHeaderStyle();
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
+      // ---- header row ----
+      const headerRow = ws.addRow(cols.map(c => c.label ?? c.key));
+      headerRow.eachCell(cell => {
+        cell.font   = headerStyle.font   as import('exceljs').Font;
+        cell.fill   = headerStyle.fill;
+        cell.border = headerStyle.border as import('exceljs').Borders;
+      });
 
-      // Explicitly overwrite date cells with text cells. aoa_to_sheet's automatic typing
-      // can emit numeric serials (t: 'n') for Date values and Excel then renders the raw
-      // serial (e.g. 45698). Writing our own formatted string with t: 's' forces Excel to
-      // display it as text regardless of SheetJS build, locale, or style-table state.
+      // ---- data rows ----
       const pad = (n: number) => String(n).padStart(2, '0');
-      for (let r = 0; r < resolvedRows.length; r++) {
-        const rowVals = resolvedRows[r];
-        for (let c = 0; c < rowVals.length; c++) {
-          const v = rowVals[c];
+      for (const row of rows) {
+        const values = cols.map(c => {
+          const v = this._getCellValue((row as Record<string, unknown>)[c.key]);
           if (v instanceof Date && !isNaN(v.getTime())) {
-            const text = `${pad(v.getDate())}/${pad(v.getMonth() + 1)}/${v.getFullYear()}`;
-            const addr = XLSX.utils.encode_cell({ r: r + 1, c }); // +1 to skip header row
-            ws[addr] = { t: 's', v: text, w: text };
+            // Format as DD/MM/YYYY string — avoids locale/timezone ambiguity in Excel
+            return `${pad(v.getDate())}/${pad(v.getMonth() + 1)}/${v.getFullYear()}`;
           }
-        }
+          return v;
+        });
+        ws.addRow(values);
       }
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Export');
-      XLSX.writeFile(wb, `${filename}.xlsx`);
-
-      this.dataExport.emit('');
+      // ---- download ----
+      wb.xlsx.writeBuffer().then((buffer: ArrayBuffer) => {
+        const blob = new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href     = url;
+        a.download = `${filename}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.dataExport.emit('');
+      });
     }).catch(() => {
-      console.warn('[ngx-mat-simple-table] xlsx export requires the "xlsx" package. ' +
-        'Install it: npm install xlsx. Falling back to CSV.');
+      console.warn('[ngx-mat-simple-table] xlsx export requires the "exceljs" package. ' +
+        'Install it: npm install exceljs. Falling back to CSV.');
       this._exportCsv(cols, rows, filename);
     });
+  }
+
+  /**
+   * Reads background colour, text colour, and font weight from the first rendered header cell
+   * and returns an ExcelJS-compatible style object. Falls back to a neutral grey if the header
+   * background is transparent or the DOM query fails.
+   */
+  private _readHeaderStyle(): {
+    font:   Partial<import('exceljs').Font>;
+    fill:   import('exceljs').Fill;
+    border: Partial<import('exceljs').Borders>;
+  } {
+    const fallbackArgb = 'FFEEEEEE';
+    const fallbackFg   = 'FF333333';
+    const fallbackFill: import('exceljs').Fill = {
+      type: 'pattern', pattern: 'solid', fgColor: { argb: fallbackArgb },
+    };
+
+    let bgArgb = fallbackArgb;
+    let fgArgb = fallbackFg;
+    let bold   = true;
+
+    try {
+      const el = (this._hostEl.nativeElement as HTMLElement)
+        .querySelector('th.mat-mdc-header-cell') as HTMLElement | null;
+      if (el) {
+        const cs = window.getComputedStyle(el);
+        bgArgb = this._cssColorToArgb(cs.backgroundColor) ?? fallbackArgb;
+        fgArgb = this._cssColorToArgb(cs.color) ?? fallbackFg;
+        bold   = parseInt(cs.fontWeight || '400') >= 600;
+      }
+    } catch { /* fall through to defaults */ }
+
+    return {
+      font:   { bold, color: { argb: fgArgb } },
+      fill:   bgArgb !== fallbackArgb
+                ? { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } }
+                : fallbackFill,
+      border: { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } },
+    };
+  }
+
+  /**
+   * Converts a CSS `rgb()`/`rgba()` string to an 8-char ARGB hex string (ExcelJS format).
+   * Returns undefined for fully-transparent or pure-white values (no meaningful fill).
+   */
+  private _cssColorToArgb(css: string): string | undefined {
+    const m = css.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (!m) return undefined;
+    const alpha = m[4] !== undefined ? parseFloat(m[4]) : 1;
+    if (alpha === 0) return undefined;
+    const aa  = Math.round(alpha * 255).toString(16).padStart(2, '0').toUpperCase();
+    const rgb = [m[1], m[2], m[3]]
+      .map(n => parseInt(n).toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase();
+    return rgb === 'FFFFFF' ? undefined : `${aa}${rgb}`;
   }
 
   private _exportCsv(cols: ColumnDef[], rows: T[], filename: string): void {

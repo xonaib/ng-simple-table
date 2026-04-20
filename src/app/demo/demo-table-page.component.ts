@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { EMPTY, switchMap } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { EMPTY, firstValueFrom, switchMap } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -151,4 +151,28 @@ export class DemoTablePageComponent {
   onColumnWidthChange(widths: Record<string, number>): void {
     console.log('[demo] column widths:', widths);
   }
+
+  /**
+   * Fetches ALL records for export (unpaginated). Passes active filters and sort so the
+   * exported file reflects what the user sees — just without the page limit.
+   * Provided to <st-export [allDataProvider]="getAllForExport"> as an arrow function so
+   * `this` is captured correctly.
+   */
+  readonly getAllForExport = (): Promise<Task[]> => {
+    // Omit page/size so the interceptor returns all matching records unpaginated.
+    // Active filters and sort are forwarded so the export reflects exactly what the user sees.
+    const params: Record<string, string> = {};
+    const sort = this._sortState();
+    if (sort?.active && sort.direction) {
+      params['sort'] = sort.active;
+      params['direction'] = sort.direction;
+    }
+    for (const [col, parent] of this._activeFilters()) {
+      const keys = parent.selectedKeys ?? [];
+      if (keys.length > 0) params[col] = keys.map(String).join(',');
+    }
+    return firstValueFrom(
+      this._http.get<TasksResponse>('/api/tasks', { params }).pipe(map(r => r.data))
+    );
+  };
 }

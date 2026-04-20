@@ -14,8 +14,10 @@ export const tasksInterceptor: HttpInterceptorFn = (req, next) => {
   if (!req.url.startsWith('/api/tasks')) return next(req);
 
   const p = req.params;
-  const page = Number(p.get('page') ?? '0');
-  const size = Number(p.get('size') ?? '10');
+  const pageRaw = p.get('page');
+  const sizeRaw = p.get('size');
+  const page    = Number(pageRaw ?? '0');
+  const size    = sizeRaw != null ? Number(sizeRaw) : null; // null = return all
   const sortCol = p.get('sort');
   const sortDir = p.get('direction') ?? 'asc';
 
@@ -44,7 +46,7 @@ export const tasksInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const total = tasks.length;
-  const data = tasks.slice(page * size, page * size + size);
+  const data  = size == null ? tasks : tasks.slice(page * size, page * size + size);
 
   console.log('[tasks-interceptor]', req.urlWithParams, { total, page, size });
   return of(new HttpResponse<TasksResponse>({ status: 200, body: { data, total } })).pipe(

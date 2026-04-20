@@ -20,4 +20,21 @@ export class StExportDirective {
   readonly format = input<'csv' | 'xlsx'>('xlsx');
   /** File name without extension. Defaults to the parent table's tableId, or 'export'. */
   readonly filename = input<string | undefined>(undefined);
+  /**
+   * Required in server-side mode. An async function that returns **all** rows (unpaginated) for
+   * export. The library only holds the current page in server-side mode, so without this the
+   * export would only contain the visible page.
+   *
+   * In client-side mode this input is ignored — the table already has every row locally.
+   *
+   * @example
+   * // host component:
+   * getAllForExport = (): Promise<Task[]> =>
+   *   firstValueFrom(this.http.get<TasksResponse>('/api/tasks', { params: { size: '999999' } })
+   *     .pipe(map(r => r.data)));
+   *
+   * // template:
+   * <st-export [allDataProvider]="getAllForExport" />
+   */
+  readonly allDataProvider = input<(() => Promise<unknown[]>) | undefined>(undefined);
 }

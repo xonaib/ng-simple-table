@@ -57,7 +57,7 @@
     (columnWidthChange)="onColumnWidthChange($event)"
   >
     <st-state-storing />
-    <st-export />
+    <st-export [allDataProvider]="getAllForExport" />
 
     <!-- custom cell template for the title column — the header is auto-generated
          inside simple-table so mat-sort-header works on all columns uniformly -->

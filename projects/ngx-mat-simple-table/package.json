@@ -21,10 +21,10 @@
     "@angular/core": ">=21.0.0",
     "@angular/forms": ">=21.0.0",
     "@angular/material": ">=21.0.0",
-    "xlsx": ">=0.18.0"
+    "exceljs": ">=4.0.0"
   },
   "peerDependenciesMeta": {
-    "xlsx": { "optional": true }
+    "exceljs": { "optional": true }
   },
   "dependencies": {
     "tslib": "^2.3.0"
