@@ -337,6 +337,12 @@ MIT
 
 ## Release Notes
 
+### v1.2.1
+
+- Fixed npm package README not reflecting v1.2 changes (was publishing stale library-level README)
+- Row hover now correctly overrides `cellClass` backgrounds for consistent hover behaviour across all cells
+- `publish:lib` script auto-syncs root README to library folder before every publish
+
 ### v1.2.0
 
 - **Sticky columns** — `ColumnDef.sticky: 'left' | 'right'` pins columns to either edge during horizontal scroll; drag guard prevents sticky columns from being reordered
