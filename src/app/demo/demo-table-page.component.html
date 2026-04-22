@@ -18,6 +18,15 @@
 
   <div class="demo-controls">
     <mat-button-toggle-group
+      [value]="isDarkTheme() ? 'dark' : 'light'"
+      (change)="isDarkTheme.set($event.value === 'dark')"
+      aria-label="Color theme"
+    >
+      <mat-button-toggle value="light">Light</mat-button-toggle>
+      <mat-button-toggle value="dark">Dark</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-button-toggle-group
       [value]="isClientSide() ? 'client' : 'server'"
       (change)="isClientSide.set($event.value === 'client')"
       aria-label="Data mode"
@@ -48,6 +57,7 @@
     [tableConfig]="effectiveConfig()"
     [length]="effectiveLength()"
     [pageIndex]="isClientSide() ? undefined : _pageIndex()"
+    [stickyHeaders]="true"
     (page)="onPage($event)"
     (sortChange)="onSortChange($event)"
     (filterChange)="onFilterChange($event)"

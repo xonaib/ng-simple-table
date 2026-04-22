@@ -17,7 +17,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
+import { NgClass, NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
@@ -57,8 +57,12 @@ const ST_SELECT_DEFAULT_SUM_PX = 52;
 @Component({
   selector: 'simple-table',
   standalone: true,
+  host: {
+    '[class.st-fill-container-host]': '_fillContainer()',
+  },
   imports: [
     TitleCasePipe,
+    NgClass,
     NgFor,
     NgTemplateOutlet,
     MatTableModule,
@@ -268,7 +272,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     return this.tableColumns().some((c) => c.sticky === 'left' || c.sticky === 'right');
   });
 
-  readonly _maxHeight = computed(() => this.tableConfig().maxHeight ?? null);
+  readonly _maxHeight       = computed(() => this.tableConfig().maxHeight ?? null);
+  readonly _fillContainer   = computed(() => this.tableConfig().fillContainer ?? false);
 
   // ---- column width state ----
 
@@ -559,7 +564,17 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   /** Called by StStateStoringDirective to restore persisted user preferences on init. */
   applyUserSettings(settings: TableUserSettings): void {
     if (settings.columnOrder?.length) {
-      this._columnOrder.set([...settings.columnOrder]);
+      // Merge saved order with the current column definitions:
+      // 1. Keep saved positions for columns that still exist.
+      // 2. Append any columns that are new since the state was saved.
+      // This prevents new columns from vanishing when old state is restored.
+      const currentKeys = this._allDataColumns().map((c) => c.key);
+      const savedSet    = new Set(settings.columnOrder);
+      const merged = [
+        ...settings.columnOrder.filter((k) => currentKeys.includes(k)),
+        ...currentKeys.filter((k) => !savedSet.has(k)),
+      ];
+      this._columnOrder.set(merged);
     }
     if (settings.hiddenColumns?.length) {
       this._hiddenColumns.set(new Set(settings.hiddenColumns));
@@ -592,6 +607,12 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     const toKey = String(event.container.data);
     if (!fromKey || !toKey || fromKey === toKey) return;
 
+    // Sticky columns have a fixed edge position — block any reorder involving them.
+    const cols = this.tableColumns();
+    const fromCol = cols.find((c) => c.key === fromKey);
+    const toCol   = cols.find((c) => c.key === toKey);
+    if (fromCol?.sticky || toCol?.sticky) return;
+
     const order = [...this._columnOrder()];
     const fi = order.indexOf(fromKey);
     const ti = order.indexOf(toKey);
@@ -605,7 +626,16 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   /** Column chooser menu: reorder only; list order matches _chooserColumnDefs / _columnOrder. */
   onColumnChooserDrop(event: CdkDragDrop<void>): void {
     if (event.previousIndex === event.currentIndex) return;
+
+    // Guard: resolve the keys at both indices and block if either column is sticky.
     const order = [...this._columnOrder()];
+    const cols  = this.tableColumns();
+    const fromKey = order[event.previousIndex];
+    const toKey   = order[event.currentIndex];
+    const fromCol = cols.find((c) => c.key === fromKey);
+    const toCol   = cols.find((c) => c.key === toKey);
+    if (fromCol?.sticky || toCol?.sticky) return;
+
     moveItemInArray(order, event.previousIndex, event.currentIndex);
     this._columnOrder.set(order);
     this.columnOrderChange.emit([...order]);

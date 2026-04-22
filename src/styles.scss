@@ -5,7 +5,8 @@
 // custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
 
-html {
+html,
+app-root {
   height: 100%;
   @include mat.theme(
     (

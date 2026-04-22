@@ -49,6 +49,21 @@ export interface ColumnDef {
    * { key: 'title', displayValue: v => v, exportValue: v => String(v) }
    */
   exportValue?: (value: unknown, row: unknown) => unknown;
+  /**
+   * Optional CSS class(es) applied to the body <td> for this column.
+   * Receives the raw cell value and the full row object; return a string,
+   * an array of strings, or null/undefined for no extra class.
+   *
+   * The host is responsible for defining the actual CSS — the component
+   * only provides the binding hook.
+   *
+   * @example
+   * { key: 'priority', cellClass: v => `priority-${v}` }
+   * // then in host CSS:
+   * // .priority-high   { background: #fee2e2; }
+   * // .priority-medium { background: #fef9c3; }
+   */
+  cellClass?: (value: unknown, row: unknown) => string | string[] | null | undefined;
 }
 
 /** Reserved column `key` for the internal layout filler — do not use in host configs. */
@@ -80,6 +95,12 @@ export interface TableConfig {
   horizontalScroll?: boolean;
   /** Fixed height for the table body with sticky header. Any valid CSS height value. */
   maxHeight?: string;
+  /**
+   * When true the table wrapper stretches to fill its parent container's height
+   * and scrolls internally. The parent element must have a defined height (px, vh, flex, etc.).
+   * Takes precedence over `maxHeight` when both are set.
+   */
+  fillContainer?: boolean;
 }
 
 export interface PaginationOptions {
