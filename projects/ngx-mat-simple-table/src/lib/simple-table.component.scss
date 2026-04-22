@@ -9,7 +9,10 @@
  * --st-row-selected-bg    Selected row background
  * --st-row-height         Row height (min-height)
  * --st-font-size          Cell font size
+ * --st-cell-color          Body cell text colour
+ * --st-row-bg              Body row background (non-hover, non-selected)
  * --st-toolbar-bg         Toolbar background colour
+ * --st-sticky-cell-bg     Body cell background for sticky (pinned) columns
  * --st-scrollbar-width      Scrollbar width (thin | auto | none)
  * --st-scrollbar-thumb      Scrollbar thumb colour
  * --st-scrollbar-track      Scrollbar track colour
@@ -44,7 +47,10 @@
   --st-row-selected-bg:   var(--mat-sys-secondary-container);
   --st-row-height:        48px;
   --st-font-size:         14px;
+  --st-cell-color:        var(--mat-sys-on-surface);
+  --st-row-bg:            transparent;
   --st-toolbar-bg:        var(--mat-sys-surface);
+  --st-sticky-cell-bg:    var(--mat-sys-surface-container);
   --st-scrollbar-width:     thin;
   --st-scrollbar-thumb:     var(--mat-sys-outline);
   --st-scrollbar-track:     transparent;
@@ -78,6 +84,11 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+
+    // Draw a border under the last row so the empty space below doesn't look like a gap.
+    table.simple-table {
+      border-bottom: 1px solid var(--st-border-color);
+    }
   }
 }
 
@@ -111,7 +122,7 @@
   background: var(--st-toolbar-bg);
 }
 
-// ---- column chooser (menu content stays in this component’s template) ----
+// ---- column chooser (menu content stays in this component's template) ----
 
 .st-column-chooser-drop-list {
   min-width: 260px;
@@ -149,7 +160,7 @@
 
   // Shared with td + absolute header overlays (cdk drag root / placeholder) so text lines up
   // with body cells: absolute children use the <th> padding *box* as CB, so inset:0 sits left of
-  // the real content box by padding-left — mirror that inset here.
+  // the real content box by padding-left -- mirror that inset here.
   --st-cell-pad-y: 10px;
   --st-cell-pad-x: 12px;
   --st-header-filter-pad-right: 44px;
@@ -279,30 +290,42 @@
 
   td.mat-mdc-cell {
     font-size: var(--st-font-size);
-    color: var(--mat-sys-on-surface);
+    color: var(--st-cell-color);
     border-bottom: 1px solid var(--st-border-color);
     padding: var(--st-cell-pad-y) var(--st-cell-pad-x);
+    transition: background-color 0.15s ease;
+  }
+
+  // ---- sticky body cells ----
+
+  td.mat-mdc-cell.st-col-sticky {
+    background-color: var(--st-sticky-cell-bg);
   }
 
   // ---- rows ----
+  // --st-row-bg lives on <tr> so it doesn't compete with cellClass backgrounds on <td>.
+  // Hover and selection target <td> directly so they override both normal and sticky
+  // cell backgrounds uniformly.
 
   tr.mat-mdc-row {
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    background-color: var(--st-row-bg);
     min-height: var(--st-row-height);
+  }
 
-    &:hover {
-      background-color: var(--st-row-hover-bg);
-    }
+  tr.mat-mdc-row:hover td.mat-mdc-cell,
+  tr.mat-mdc-row:hover td.mat-mdc-cell.st-col-sticky {
+    background-color: var(--st-row-hover-bg);
+  }
 
-    &.selected-row {
-      background-color: var(--st-row-selected-bg);
-    }
+  tr.mat-mdc-row.selected-row td.mat-mdc-cell,
+  tr.mat-mdc-row.selected-row td.mat-mdc-cell.st-col-sticky {
+    background-color: var(--st-row-selected-bg);
   }
 
   // ---- checkbox column ----
   // MDC checkbox needs ~40px touch target; 40px col + default pad left 12px clipped the control.
-  // Header cells use overflow:hidden for drag headers — allow visible overflow here only.
+  // Header cells use overflow:hidden for drag headers -- allow visible overflow here only.
 
   th.mat-mdc-header-cell.mat-column-select,
   td.mat-mdc-cell.mat-column-select {
@@ -314,7 +337,7 @@
     vertical-align: middle;
   }
 
-  // Do not use width: 100% here — under table-layout: fixed it steals the whole table and
+  // Do not use width: 100% here -- under table-layout: fixed it steals the whole table and
   // collapses sibling auto columns to 0. Remaining space is distributed to width:auto columns;
   // this column is last and has min-width 0 so it tends to absorb the slack after auto mins.
   th.mat-mdc-header-cell.st-layout-filler,
@@ -331,4 +354,3 @@
 mat-paginator {
   border-top: 1px solid var(--st-border-color);
 }
-

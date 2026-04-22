@@ -96,3 +96,15 @@ simple-table {
     text-decoration: underline;
   }
 }
+
+// ---- cell class demo styles ----
+
+:host ::ng-deep {
+  .priority-high   { color: light-dark(#b91c1c, #fca5a5); font-weight: 600; }
+  .priority-medium { color: light-dark(#92400e, #fcd34d); }
+  .priority-low    { color: var(--mat-sys-on-surface-variant); }
+
+  .status-done        { background: light-dark(#dcfce7, #14532d); color: light-dark(#15803d, #86efac); font-weight: 500; }
+  .status-in-progress { background: light-dark(#dbeafe, #1e3a5f); color: light-dark(#1d4ed8, #93c5fd); }
+  .status-todo        { background: light-dark(#f1f5f9, #1e293b); color: var(--mat-sys-on-surface-variant); }
+}

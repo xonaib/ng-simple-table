@@ -17,7 +17,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
+import { NgClass, NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
@@ -62,6 +62,7 @@ const ST_SELECT_DEFAULT_SUM_PX = 52;
   },
   imports: [
     TitleCasePipe,
+    NgClass,
     NgFor,
     NgTemplateOutlet,
     MatTableModule,

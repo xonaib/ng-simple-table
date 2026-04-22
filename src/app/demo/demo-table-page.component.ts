@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { EMPTY, firstValueFrom, switchMap } from 'rxjs';
@@ -37,6 +38,17 @@ import { TasksResponse } from './tasks.interceptor';
 })
 export class DemoTablePageComponent {
   private readonly _http = inject(HttpClient);
+  private readonly _document = inject(DOCUMENT);
+
+  // ---- theme toggle ----
+
+  readonly isDarkTheme = signal(false);
+
+  constructor() {
+    effect(() => {
+      this._document.body.style.colorScheme = this.isDarkTheme() ? 'dark' : 'light';
+    });
+  }
 
   // ---- column definitions ----
 
@@ -46,9 +58,11 @@ export class DemoTablePageComponent {
     { key: 'title',       label: 'Title',    width: 220, sticky: 'left', hasColumnFilters: true },
     { key: 'assignee',    label: 'Assignee', width: 140, hasColumnFilters: true, filterType: FilterType.DropDown },
     { key: 'status',      label: 'Status',   width: 140, hasColumnFilters: true, filterType: FilterType.DropDown,
-      displayValue: v => String(v ?? '').replace(/-/g, ' ').toUpperCase() },
+      displayValue: v => String(v ?? '').replace(/-/g, ' ').toUpperCase(),
+      cellClass: v => `status-${String(v ?? '')}` },
     { key: 'priority',    label: 'Priority', width: 110, hasColumnFilters: true, filterType: FilterType.DropDown,
-      displayValue: v => String(v ?? '').toUpperCase() },
+      displayValue: v => String(v ?? '').toUpperCase(),
+      cellClass: v => `priority-${String(v ?? '')}` },
     { key: 'team',        label: 'Team',     width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
     { key: 'sprint',      label: 'Sprint',   width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
     { key: 'reporter',    label: 'Reporter', width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
@@ -65,7 +79,7 @@ export class DemoTablePageComponent {
   readonly effectiveConfig = computed(
     (): TableConfig => ({
       isPaginated: true,
-      paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
+      paginationOptions: { defaultPageSize: 25, pageSizeOptions: [5, 10, 25, 50] },
       clientSide: this.isClientSide(),
       horizontalScroll: true,
       fillContainer: true,
@@ -77,7 +91,7 @@ export class DemoTablePageComponent {
   private readonly _activeFilters = signal<Map<string, ItemParent>>(new Map());
   private readonly _sortState = signal<Sort | null>(null);
   readonly _pageIndex = signal(0); // non-private: passed to simple-table [pageIndex]
-  private readonly _pageSize = signal(10);
+  private readonly _pageSize = signal(25);
   private readonly _refreshCounter = signal(0);
 
   // ---- HTTP params (server-side mode) ----
