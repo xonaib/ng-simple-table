@@ -365,4 +365,12 @@ MIT
 
 - **Declarative columns** — `ColumnDef[]` drives every aspect: label, width, sort, filter type, sticky side, displayValue
 - **Dual data-source mode** — server-side (host owns state signals) and client-side (`MatTableDataSource` owned internally)
-- **Custom cell templates** — `cellDef` directive for fully custom cell markup while keepin
+- **Custom cell templates** — `cellDef` directive for fully custom cell markup while keeping auto-generated sort headers
+- **Column-level dropdown filters** — builds option lists from visible data; Apply/Clear only
+- **Header drag-reorder** — CDK drag-drop; sticky columns excluded
+- **Column chooser** — toolbar menu with checkboxes and drag handles
+- **State persistence** — `StStateStoringDirective` saves to `localStorage`
+- **Export** — `StExportDirective` with ExcelJS
+- **Resize handles** — per-column drag; emits `(columnWidthChange)`
+- **`select` column** — built-in checkbox column with master toggle
+- **OnPush + signals throughout**
