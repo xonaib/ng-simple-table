@@ -58,8 +58,9 @@
 <div
   class="st-table-wrapper"
   [class.st-horizontal-scroll]="_hasHorizontalScroll()"
-  [style.max-height]="_maxHeight()"
-  [class.st-has-max-height]="!!_maxHeight()"
+  [style.max-height]="!_fillContainer() ? _maxHeight() : null"
+  [class.st-has-max-height]="!_fillContainer() && !!_maxHeight()"
+  [class.st-fill-container]="_fillContainer()"
 >
 <table
   class="simple-table"
@@ -115,6 +116,7 @@
       (cdkDropListDropped)="onColumnDrop($event)"
       [class.filter-col]="column.hasColumnFilters"
       [class.draggable]="_isDraggable()"
+      [class.st-col-sticky]="!!column.sticky"
       [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
       [style.width]="effectiveWidthStyleForDataColumn(column)"
     >
@@ -122,7 +124,7 @@
         class="st-header-drag-root"
         cdkDrag
         [cdkDragData]="column.key"
-        [cdkDragDisabled]="!_isDraggable()"
+        [cdkDragDisabled]="!_isDraggable() || !!column.sticky"
         cdkDragLockAxis="x"
       >
         <!-- Custom preview: default clone is portaled to <body> and loses emulated-encapsulation

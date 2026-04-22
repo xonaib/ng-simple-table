@@ -2,6 +2,17 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+
+  // ---- filter popup theme tokens ----
+  // Override any of these on <simple-table> or a parent selector.
+  --st-filter-popup-bg:      var(--mat-sys-surface);
+  --st-filter-popup-border:  var(--mat-sys-outline-variant);
+  --st-filter-header-bg:     var(--mat-sys-surface-variant);
+  --st-filter-header-color:  var(--mat-sys-on-surface-variant);
+  --st-filter-footer-bg:     var(--mat-sys-surface-variant);
+  --st-filter-footer-border: var(--mat-sys-outline-variant);
+  --st-filter-input-bg:      var(--mat-sys-surface);
+  --st-filter-input-border:  var(--mat-sys-outline-variant);
 }
 
 .filter-toggle {
@@ -44,8 +55,8 @@
   position: fixed;
   z-index: 1000;
   width: 280px;
-  background: var(--mat-sys-surface);
-  border: 1px solid var(--mat-sys-outline-variant);
+  background: var(--st-filter-popup-bg);
+  border: 1px solid var(--st-filter-popup-border);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   overflow: hidden;
@@ -53,8 +64,8 @@
 
 .filter-header {
   padding: 10px 16px;
-  background: var(--mat-sys-surface-variant);
-  color: var(--mat-sys-on-surface-variant);
+  background: var(--st-filter-header-bg);
+  color: var(--st-filter-header-color);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -119,10 +130,10 @@
   input {
     width: 100%;
     padding: 6px 10px 6px 34px;
-    border: 1px solid var(--mat-sys-outline-variant);
+    border: 1px solid var(--st-filter-input-border);
     border-radius: 4px;
     font-size: 13px;
-    background: var(--mat-sys-surface);
+    background: var(--st-filter-input-bg);
     color: var(--mat-sys-on-surface);
     box-sizing: border-box;
 
@@ -168,8 +179,8 @@
   display: flex;
   gap: 8px;
   padding: 8px 12px;
-  border-top: 1px solid var(--mat-sys-outline-variant);
-  background: var(--mat-sys-surface-variant);
+  border-top: 1px solid var(--st-filter-footer-border);
+  background: var(--st-filter-footer-bg);
 
   button {
     flex: 1;
@@ -200,9 +211,9 @@
   input[type='date'] {
     width: 100%;
     padding: 6px 10px;
-    border: 1px solid var(--mat-sys-outline-variant);
+    border: 1px solid var(--st-filter-input-border);
     border-radius: 4px;
-    background: var(--mat-sys-surface);
+    background: var(--st-filter-input-bg);
     color: var(--mat-sys-on-surface);
     font-size: 14px;
     box-sizing: border-box;

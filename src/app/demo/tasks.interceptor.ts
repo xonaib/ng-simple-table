@@ -8,7 +8,7 @@ export interface TasksResponse {
   total: number;
 }
 
-const FILTERABLE = ['title', 'assignee', 'status', 'priority'] as const;
+const FILTERABLE = ['title', 'assignee', 'status', 'priority', 'team', 'sprint', 'reporter'] as const;
 
 export const tasksInterceptor: HttpInterceptorFn = (req, next) => {
   if (!req.url.startsWith('/api/tasks')) return next(req);

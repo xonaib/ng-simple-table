@@ -80,6 +80,12 @@ export interface TableConfig {
   horizontalScroll?: boolean;
   /** Fixed height for the table body with sticky header. Any valid CSS height value. */
   maxHeight?: string;
+  /**
+   * When true the table wrapper stretches to fill its parent container's height
+   * and scrolls internally. The parent element must have a defined height (px, vh, flex, etc.).
+   * Takes precedence over `maxHeight` when both are set.
+   */
+  fillContainer?: boolean;
 }
 
 export interface PaginationOptions {

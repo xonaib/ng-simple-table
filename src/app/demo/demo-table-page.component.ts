@@ -42,15 +42,20 @@ export class DemoTablePageComponent {
 
   readonly columns: ColumnDef[] = [
     { key: 'select' },
-    { key: 'id', label: 'ID', width: 72 },
-    { key: 'title', label: 'Title', width: 200, hasColumnFilters: true },
-    { key: 'assignee', label: 'Assignee', hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'status',   label: 'Status',   hasColumnFilters: true, filterType: FilterType.DropDown,
+    { key: 'id',          label: 'ID',       width: 72,  sticky: 'left' },
+    { key: 'title',       label: 'Title',    width: 220, sticky: 'left', hasColumnFilters: true },
+    { key: 'assignee',    label: 'Assignee', width: 140, hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'status',      label: 'Status',   width: 140, hasColumnFilters: true, filterType: FilterType.DropDown,
       displayValue: v => String(v ?? '').replace(/-/g, ' ').toUpperCase() },
-    { key: 'priority', label: 'Priority', hasColumnFilters: true, filterType: FilterType.DropDown,
+    { key: 'priority',    label: 'Priority', width: 110, hasColumnFilters: true, filterType: FilterType.DropDown,
       displayValue: v => String(v ?? '').toUpperCase() },
-    { key: 'dueDate', label: 'Due Date' },
-    { key: 'storyPoints', label: 'Points' },
+    { key: 'team',        label: 'Team',     width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'sprint',      label: 'Sprint',   width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'reporter',    label: 'Reporter', width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
+    { key: 'estimate',    label: 'Estimate', width: 100 },
+    { key: 'tags',        label: 'Tags',     width: 180 },
+    { key: 'dueDate',     label: 'Due Date', width: 120 },
+    { key: 'storyPoints', label: 'Points',   width: 90 },
   ];
 
   // ---- mode toggle ----
@@ -62,6 +67,8 @@ export class DemoTablePageComponent {
       isPaginated: true,
       paginationOptions: { defaultPageSize: 10, pageSizeOptions: [5, 10, 25, 50] },
       clientSide: this.isClientSide(),
+      horizontalScroll: true,
+      fillContainer: true,
     }),
   );
 

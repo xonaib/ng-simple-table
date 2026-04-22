@@ -175,17 +175,16 @@ Opens `http://localhost:4200` — task table with server/client toggle, filters,
 
 ## Roadmap
 
-**V2**
+**v1.2**
 
 - Date range filter
 - Optional **text wrap** for fixed-width / narrow columns (see Known gaps)
 - Richer server-side query typing helpers
 
-**V3**
+**v1.3**
 
 - Virtual scrolling
 - Inline row editing
-- `ng-packagr` library build for npm publish
 - Storybook stories
 
 ## License
@@ -194,15 +193,37 @@ MIT
 
 ## Blog Post
 
-[I got tired of copy-pasting the same Angular Material table setup, so I built a library](https://dev.to/zonaibbokhari/i-got-tired-of-copy-pasting-the-same-table-code-so-i-built-a-library-434k) — covers the build process, decisions, and what broke along the way.
+[I got tired of copy-pasting the same Angular Material table setup, so I built a library](https://dev.to/zonaibbokhari/i-got-tired-of-copy-pasting-the-same-table-code-so-i-built-a-library-2c3l) — covers the build process, decisions, and what broke along the way.
 
 ---
 
-## References
+## Release Notes
 
-Similar “dynamic Material table” ideas (for comparison, not dependencies):
+### v1.2.0
 
-- [dynamic-mat-table (npm)](https://www.npmjs.com/package/dynamic-mat-table)
-- [relair/material-dynamic-table](https://github.com/relair/material-dynamic-table)
-- [arditsinani/mat-dynamic-table](https://github.com/arditsinani/mat-dynamic-table)
-- [lukekroon/ngx-mat-dynamic-table](https://github.com/lukekroon/ngx-mat-dynamic-table)
+- **Fixed (sticky) columns** — `ColumnDef.sticky: 'left' | 'right'` pins columns to either edge during horizontal scroll; auto-enables horizontal scroll on the wrapper
+- **Drag guard for sticky columns** — sticky columns cannot be reordered via header drag or the column chooser; drag is visually disabled on sticky headers
+- **`fillContainer` mode** — `TableConfig.fillContainer: true` makes the table expand to fill its parent's height and scroll internally; toolbar, sticky header, and paginator always remain visible
+- **`applyUserSettings` column merge fix** — new columns added to `tableColumns` after a saved state exists are now correctly appended rather than silently dropped
+- **Filter popup CSS custom properties** — eight `--st-filter-*` tokens (`--st-filter-popup-bg`, `--st-filter-header-bg`, `--st-filter-footer-bg`, `--st-filter-popup-border`, etc.) let consumers restyle the dropdown without touching Angular Material internals
+- **Column chooser max-height + scroll** — chooser list caps at `--st-chooser-max-height` (320px default) and scrolls beyond that; breakpoint overrides reduce it to 220px on tablet and 160px on mobile
+
+### v1.1.2
+
+- Deployment and package stability fixes
+- Vercel build pipeline corrections
+
+### v1.1.0
+
+- **Export to Excel** — `ExportService` with full XLSX support via ExcelJS (header styling, column formatting)
+- **`displayValue` transform** — shared helper for rendering derived or formatted cell values
+- **Export-all-records** — export beyond the current page in server-side mode
+- Switched from basic xlsx to ExcelJS for richer spreadsheet output
+- Library build cleanup (`ngx-mat-simple-table` via ng-packagr, published to npm)
+
+### v1.0.0
+
+- **Declarative columns** — `ColumnDef[]` array replaces per-column template boilerplate
+- **Sorting** — `MatSort` on all data columns; `sortable` defaults to `true`
+- **Row selection** — multi-select checkboxes with master toggle and `selectedRows` input
+- **Dropdown column

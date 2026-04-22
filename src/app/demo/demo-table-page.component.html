@@ -48,6 +48,7 @@
     [tableConfig]="effectiveConfig()"
     [length]="effectiveLength()"
     [pageIndex]="isClientSide() ? undefined : _pageIndex()"
+    [stickyHeaders]="true"
     (page)="onPage($event)"
     (sortChange)="onSortChange($event)"
     (filterChange)="onFilterChange($event)"
