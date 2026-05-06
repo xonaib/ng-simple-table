@@ -26,7 +26,7 @@
 
 <p>After doing it the fourth time, I decided to just extract it into a library.</p>
 
-<p>It's called <strong>ngx-mat-simple-table</strong>. It wraps Angular Material's <code>mat-table</code> in a clean, declarative API so you get sorting, filtering, pagination, multi-select, and more — without writing a wall of template code every time.</p>
+<p>It's called <strong>ngx-mat-simple-table</strong>. It wraps Angular Material's <code>mat-table</code> in a clean, declarative API so you get sorting, filtering, pagination, multi-select, row actions, and more — without writing a wall of template code every time.</p>
 
 <hr />
 
@@ -70,15 +70,20 @@
 <p>You define your columns once in the component:</p>
 
 <pre><code>columns: ColumnDef[] = [
-  { key: 'id',       label: 'ID',       sortable: true },
-  { key: 'title',    label: 'Title',    sortable: true, filterable: true },
-  { key: 'status',   label: 'Status',   sortable: true, filterable: true },
-  { key: 'priority', label: 'Priority', cellClass: (row) => `priority-${row.priority}` },
+  { key: 'select' },  // built-in checkbox column
+  { key: 'id',       label: 'ID',       width: 72,  sticky: 'left' },
+  { key: 'title',    label: 'Title',    width: 220, hasColumnFilters: true },
+  { key: 'status',   label: 'Status',   width: 140, hasColumnFilters: true,
+    displayValue: v => String(v).replace(/-/g, ' ').toUpperCase(),
+    cellClass: v => `status-${v}` },
+  { key: 'priority', label: 'Priority', width: 110, hasColumnFilters: true },
 ];
 
 config: TableConfig = {
-  selectable: true,
-  pagination: { pageSizeOptions: [10, 25, 50], defaultPageSize: 25 },
+  isPaginated: true,
+  paginationOptions: { defaultPageSize: 25, pageSizeOptions: [10, 25, 50] },
+  horizontalScroll: true,
+  fillContainer: true,
 };</code></pre>
 
 <p>That's it. Sorting, per-column dropdown filters, pagination, and row selection are all wired up automatically.</p>
@@ -99,15 +104,97 @@ config: TableConfig = {
 
 <hr />
 
+<h2>Declarative actions</h2>
+
+<p>One pattern that keeps coming up in data tables is action buttons — a toolbar "Add" button, per-row edit/delete, a bulk-delete button that's disabled until rows are selected. The v1.2 release adds a declarative <code>TableAction[]</code> API that covers all of these with a single input.</p>
+
+<p>Each action has a <code>position</code> that controls where it renders:</p>
+
+<ul>
+  <li><strong>toolbar</strong> — left side of the toolbar row, next to the column chooser and export icons</li>
+  <li><strong>above</strong> — same toolbar row, rendered first (useful for primary CTAs)</li>
+  <li><strong>below</strong> — left side of the paginator row, so bulk actions sit right next to page controls</li>
+  <li><strong>row-inline</strong> — icon button visible on every row in a sticky-end column</li>
+  <li><strong>row-menu</strong> — items inside the ⋯ overflow menu in the same sticky column</li>
+</ul>
+
+<pre><code>actions: TableAction&lt;Task&gt;[] = [
+  {
+    id: 'add',
+    label: 'New task',
+    icon: 'add',
+    position: 'toolbar',
+    color: 'primary',
+    variant: 'flat',
+    cb: () => this.openCreateDialog(),
+  },
+  {
+    id: 'bulk-delete',
+    label: 'Delete selected',
+    icon: 'delete_sweep',
+    position: 'toolbar',
+    color: 'warn',
+    variant: 'stroked',
+    disabled: () => this.selectedRows().length === 0,
+    cb: () => this.bulkDelete(this.selectedRows()),
+  },
+  {
+    id: 'edit',
+    icon: 'edit',          // label omitted → icon-only button with tooltip
+    position: 'row-inline',
+    cb: (row) => this.openEditDialog(row),
+  },
+  {
+    id: 'delete',
+    label: 'Delete',
+    icon: 'delete',
+    position: 'row-menu',
+    color: 'warn',
+    cb: (row) => this.deleteTask(row),
+  },
+  {
+    id: 'export-selected',
+    label: 'Export selected',
+    icon: 'file_download',
+    position: 'below',
+    disabled: () => this.selectedRows().length === 0,
+    cb: () => this.exportSelected(),
+  },
+];</code></pre>
+
+<pre><code>&lt;simple-table
+  [dataSource]="tasks"
+  [tableColumns]="columns"
+  [tableConfig]="config"
+  [actions]="actions"
+  (selectionChange)="selectedRows.set($event)"
+&gt;
+&lt;/simple-table&gt;</code></pre>
+
+<p>The <code>label</code> field is optional — omit it and the button renders as an icon-only <code>mat-icon-button</code> with a tooltip. For non-row positions you can also set <code>variant</code> to <code>'flat'</code>, <code>'stroked'</code>, or <code>'text'</code> to control the Material button style. Row-inline actions are always icon buttons; row-menu items are always <code>mat-menu-item</code>.</p>
+
+<hr />
+
 <h2>Server-side mode</h2>
 
-<p>For larger datasets you'll want server-side pagination, sorting, and filtering. The component handles that too — you just provide an observable as the data source and wire up the events:</p>
+<p>For larger datasets you'll want server-side pagination, sorting, and filtering. The component handles that too — you pass your current page slice as <code>[dataSource]</code> and wire up the events:</p>
 
-<pre><code>(page)="onPage($event)"
-(sortChange)="onSort($event)"
-(filterChange)="onFilter($event)"</code></pre>
+<pre><code>&lt;simple-table
+  [dataSource]="currentPage()"
+  [length]="totalRows()"
+  [pageIndex]="_pageIndex()"
+  [tableColumns]="columns"
+  [tableConfig]="config"
+  (page)="onPage($event)"
+  (sortChange)="onSort($event)"
+  (filterChange)="onFilter($event)"
+  (refresh)="onRefresh()"
+&gt;
+&lt;/simple-table&gt;</code></pre>
 
-<p>Each event gives you the current state, so you can build your API params and feed the response back in. The component tracks loading state so you can show a progress bar in the meantime.</p>
+<p>Each event gives you the current state so you can build your API params and feed the response back in.</p>
+
+<p>If your API doesn't return a total row count — cursor-based pagination, for example — just omit <code>[length]</code>. The component will infer next/prev availability from the number of rows returned: if a page comes back full, there's probably a next page; if it comes back short, the next button is disabled automatically. No extra input needed.</p>
 
 <hr />
 
@@ -135,12 +222,14 @@ config: TableConfig = {
 <h2>Other bits worth mentioning</h2>
 
 <ul>
-  <li><strong>Column reordering</strong> — drag and drop headers to rearrange columns. CDK-powered.</li>
-  <li><strong>Column resizing</strong> — drag the right edge of any header to resize.</li>
-  <li><strong>State persistence</strong> — drop in <code>&lt;st-state-storing /&gt;</code> and the component saves column order, widths, and active filters to localStorage automatically.</li>
-  <li><strong>Export to Excel</strong> — <code>&lt;st-export [allDataProvider]="getAllRows" /&gt;</code> adds an export button. Uses <code>exceljs</code> (optional peer dep).</li>
-  <li><strong>Sticky headers and columns</strong> — <code>[stickyHeaders]="true"</code> and <code>sticky: true</code> on a column def.</li>
-  <li><strong>Client-side mode</strong> — pass a plain array and the component handles sort, filter, and pagination internally with <code>MatTableDataSource</code>.</li>
+  <li><strong>Column reordering</strong> — drag and drop headers to rearrange columns. CDK-powered. Sticky columns are excluded.</li>
+  <li><strong>Column resizing</strong> — drag the right edge of any header to resize. Emits <code>(columnWidthChange)</code> so you can persist widths.</li>
+  <li><strong>Column chooser</strong> — toolbar menu to show/hide and reorder columns.</li>
+  <li><strong>State persistence</strong> — drop in <code>stStateStoring</code> and the component saves column order, visibility, and widths to localStorage automatically.</li>
+  <li><strong>Export to Excel</strong> — <code>stExport</code> adds an export button. Provide an <code>allDataProvider</code> callback to fetch all records (not just the current page) for a full export. Uses <code>exceljs</code> (optional peer dep).</li>
+  <li><strong>Sticky columns</strong> — <code>sticky: 'left'</code> or <code>sticky: 'right'</code> on a column def pins it during horizontal scroll.</li>
+  <li><strong>Fill-container height</strong> — <code>fillContainer: true</code> stretches the table to fill its parent; toolbar and paginator always stay in view.</li>
+  <li><strong>Client-side mode</strong> — pass a plain array and set <code>clientSide: true</code> in the config. The component handles sort, filter, and pagination internally with <code>MatTableDataSource</code>.</li>
 </ul>
 
 <hr />
@@ -151,9 +240,14 @@ config: TableConfig = {
 
 <p>Peer deps are Angular 21+ and Angular Material 21+. <code>exceljs</code> is optional — only needed if you use the export feature.</p>
 
-<p>Then import <code>SimpleTableComponent</code> and the directives you need:</p>
+<p>Then import the components and directives you need:</p>
 
-<pre><code>import { SimpleTableComponent, CellDefDirective, StStateStoringComponent } from 'ngx-mat-simple-table';</code></pre>
+<pre><code>import {
+  SimpleTableComponent,
+  CellDefDirective,
+  StStateStoringDirective,
+  StExportDirective,
+} from 'ngx-mat-simple-table';</code></pre>
 
 <hr />
 

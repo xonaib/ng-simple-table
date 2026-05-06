@@ -23,6 +23,8 @@ Each column is identified by a **`key`** string: it is both the `matColumnDef` i
 | Row selection | Multi-select checkboxes, master toggle, `selectionChange` output |
 | Dropdown column filters | Distinct values built from `dataSource`; Apply/Clear emits `(filterChange)` |
 | Pagination | `MatPaginator` with configurable page sizes; server- and client-side modes |
+| Unknown-total pagination | Omit `[length]` in server-side mode — next/prev inferred automatically from page row count |
+| **Declarative actions** | `TableAction[]` with five position slots: toolbar, above, below, row-inline, row-menu |
 | Sticky columns | `ColumnDef.sticky: 'left' \| 'right'` — pins columns to either edge; drag-reorder is disabled for sticky columns |
 | Fill-container height | `TableConfig.fillContainer: true` — table expands to fill its parent; toolbar and paginator always stay in view |
 | Column widths | Optional `width` on `ColumnDef` (`number` = px, `string` = CSS). Resize overrides at runtime |
@@ -34,7 +36,7 @@ Each column is identified by a **`key`** string: it is both the `matColumnDef` i
 | Custom cell templates | `cellDef` attribute on `<ng-template>` — value must match the column `key` |
 | State persistence | `StStateStoringDirective` saves column order, visibility, and widths to `localStorage` |
 | Export to Excel | `StExportDirective` with full XLSX via ExcelJS; export all records via `allDataProvider` |
-| CSS theming | 14 `--st-*` custom properties for colours, borders, font, row height, scrollbar, and sticky cells |
+| CSS theming | 22 `--st-*` custom properties for colours, borders, font, row height, scrollbar, and sticky cells |
 | Dark mode | Set `body { color-scheme: dark }` — all `--st-*` tokens and Angular Material tokens flip automatically |
 | OnPush + signals | `ChangeDetectionStrategy.OnPush` throughout; zero `ChangeDetectorRef` usage |
 
@@ -139,12 +141,10 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `clientSide` | `boolean` | `false` | Hand sorting, filtering, and pagination to an internal `MatTableDataSource`. |
 | `horizontalScroll` | `boolean` | `false` | Enable horizontal scroll on the table wrapper. |
 | `fillContainer` | `boolean` | `false` | Stretch the table to fill its parent height; toolbar and paginator stay in view. |
-| `stickyToolbar` | `boolean` | `false` | Stick the toolbar row (column chooser / export / refresh) to the top. |
-| `showColumnChooser` | `boolean` | `true` | Show the column-chooser button. |
-| `showExport` | `boolean` | `true` | Show the export button (requires `StExportDirective`). |
-| `showRefresh` | `boolean` | `false` | Show the refresh button. |
-| `isDraggable` | `boolean` | `true` | Enable column drag-reorder. |
-| `isResizable` | `boolean` | `true` | Enable column resize handles. |
+| `showColumnChooser` | `boolean` | `true` | Show the column-chooser button in the toolbar. |
+| `showRefresh` | `boolean` | `true` | Show the refresh button in the toolbar. |
+| `columnDraggable` | `boolean` | `true` | Enable column drag-reorder. |
+| `columnResizable` | `boolean` | `true` | Enable column resize handles. |
 | `maxHeight` | `string` | — | CSS max-height on the scroll wrapper (ignored when `fillContainer` is true). |
 
 ## Inputs
@@ -245,6 +245,111 @@ Set `hasColumnFilters: true` and `filterType: FilterType.DropDown`. The table bu
 
 Read `ItemParent.selectedKeys` in the `(filterChange)` handler for the active values.
 
+## Actions
+
+Pass a `TableAction<T>[]` to `[actions]` to add buttons anywhere around the table without writing any extra template code.
+
+```typescript
+import { TableAction } from 'ngx-mat-simple-table';
+
+actions: TableAction<Task>[] = [
+  // left side of the toolbar
+  {
+    id: 'add',
+    label: 'New task',
+    icon: 'add',
+    position: 'toolbar',
+    color: 'primary',
+    variant: 'flat',
+    cb: () => this.openCreateDialog(),
+  },
+  {
+    id: 'bulk-delete',
+    label: 'Delete selected',
+    icon: 'delete_sweep',
+    position: 'toolbar',
+    color: 'warn',
+    variant: 'stroked',
+    disabled: () => this.selected().length === 0,
+    cb: () => this.bulkDelete(this.selected()),
+  },
+  // icon button on every row (label omitted → icon-only with tooltip)
+  {
+    id: 'edit',
+    icon: 'edit',
+    position: 'row-inline',
+    cb: (row) => this.openEditDialog(row),
+  },
+  // overflow menu on every row
+  {
+    id: 'delete',
+    label: 'Delete',
+    icon: 'delete',
+    position: 'row-menu',
+    color: 'warn',
+    cb: (row) => this.deleteTask(row),
+  },
+  // left side of the paginator row
+  {
+    id: 'export-selected',
+    label: 'Export selected',
+    icon: 'file_download',
+    position: 'below',
+    disabled: () => this.selected().length === 0,
+    cb: () => this.exportSelected(),
+  },
+];
+```
+
+```html
+<simple-table
+  [dataSource]="tasks"
+  [tableColumns]="columns"
+  [tableConfig]="config"
+  [actions]="actions"
+  (selectionChange)="selected.set($event)"
+>
+</simple-table>
+```
+
+### Action positions
+
+| Position | Where it renders |
+| --- | --- |
+| `toolbar` | Left side of the toolbar row, alongside the column-chooser and export icons |
+| `above` | Same toolbar row, rendered before `toolbar` actions |
+| `below` | Left side of the paginator row |
+| `row-inline` | Icon button visible on every row in a sticky-end column |
+| `row-menu` | Item inside the ⋯ overflow menu in the same sticky column |
+
+### `TableAction<T>` properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | **Required.** Unique key; used as track id. |
+| `position` | `ActionPosition` | **Required.** Where the action renders. |
+| `cb` | `(row: T \| undefined) => void` | **Required.** Called on click. `row` is the clicked row for row positions, `undefined` otherwise. |
+| `label` | `string` | Button label. Omit for an icon-only button (tooltip falls back to `id`). |
+| `icon` | `string` | Material icon name. |
+| `variant` | `'flat' \| 'stroked' \| 'text' \| 'icon'` | Button style for non-row positions. Defaults to `'stroked'`. |
+| `color` | `'primary' \| 'accent' \| 'warn'` | Material button colour. |
+| `disabled` | `(row: T \| undefined) => boolean` | Return `true` to disable. |
+
+## Unknown-total pagination
+
+If your API doesn't return a total row count, omit `[length]`. The table infers next/prev availability from the number of rows returned: a full page enables the next button; a short page disables it. No extra configuration needed.
+
+```html
+<simple-table
+  [dataSource]="currentPage()"
+  [pageIndex]="_pageIndex()"
+  [tableColumns]="columns"
+  [tableConfig]="config"
+  (page)="onPage($event)"
+>
+</simple-table>
+```
+
 ## State persistence
 
 Add `<st-state-storing />` inside `<simple-table>` and provide a unique `tableId`:
@@ -336,6 +441,14 @@ MIT
 ---
 
 ## Release Notes
+
+### v1.2.2
+
+- **Declarative actions API** — `TableAction<T>[]` with five position slots (`toolbar`, `above`, `below`, `row-inline`, `row-menu`); icon-only buttons when `label` is omitted; `disabled` callback; `variant` controls Material button style
+- **Unknown-total pagination** — omit `[length]` in server-side mode and next/prev availability is inferred automatically from page row count
+- **Toolbar layout** — `above` and `toolbar` actions share one row with built-in controls; `below` actions share the paginator row, eliminating wasted vertical space
+- **Tooltips on built-in toolbar icons** — column chooser, export, and refresh buttons now show `matTooltip` labels
+- **`TableConfig` keys corrected** — `columnDraggable` / `columnResizable` (were `isDraggable` / `isResizable`)
 
 ### v1.2.1
 
