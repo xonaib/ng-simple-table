@@ -1,6 +1,6 @@
 # simple-table
 
-A reusable, declarative Angular Material data table built with Angular 21. Configure columns with a JSON array, get sorting, multi-select, dropdown filters, pagination, sticky columns, theming, and dark mode out of the box — with an escape hatch for custom cell templates. Zero third-party dependencies beyond Angular Material.
+A reusable, declarative Angular Material data table built with Angular 21. Configure columns with a JSON array, get sorting, multi-select, dropdown filters, pagination, sticky columns, row actions, theming, and dark mode out of the box — with an escape hatch for custom cell templates. Zero third-party dependencies beyond Angular Material.
 
 | | |
 | --- | --- |
