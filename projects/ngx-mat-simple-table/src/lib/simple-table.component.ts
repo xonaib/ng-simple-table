@@ -21,10 +21,11 @@ import { NgClass, NgFor, NgTemplateOutlet, TitleCasePipe } from '@angular/common
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
-import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatPaginator, MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
 import {
   CdkDragDrop,
@@ -46,6 +47,8 @@ import {
   FilterType,
   ItemParent,
   SIMPLE_TABLE_LAYOUT_FILLER_COLUMN,
+  ST_ROW_ACTIONS_COLUMN,
+  TableAction,
   TableConfig,
   TableUserSettings,
 } from './table.types';
@@ -72,6 +75,7 @@ const ST_SELECT_DEFAULT_SUM_PX = 52;
     MatIconModule,
     MatButtonModule,
     MatMenuModule,
+    MatTooltipModule,
     CdkDrag,
     CdkDragHandle,
     CdkDragPlaceholder,
@@ -83,11 +87,13 @@ const ST_SELECT_DEFAULT_SUM_PX = 52;
   templateUrl: './simple-table.component.html',
   styleUrl: './simple-table.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [MatPaginatorIntl],
 })
 export class SimpleTableComponent<T> implements AfterContentInit {
   private readonly _destroyRef  = inject(DestroyRef);
   private readonly _hostEl      = inject(ElementRef<HTMLElement>);
   private readonly _exportSvc   = inject(SimpleTableExportService);
+  private readonly _paginatorIntl = inject(MatPaginatorIntl);
 
   /** `matColumnDef` id for the internal filler column (template + row defs only). */
   readonly layoutFillerColumnDef = SIMPLE_TABLE_LAYOUT_FILLER_COLUMN;
@@ -120,6 +126,40 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly pageIndex = input<number | undefined>(undefined);
   readonly stickyHeaders = input(false);
   readonly selectedRows = input<T[] | undefined>();
+  /**
+   * Declarative action buttons for the table. Each action specifies a `position`:
+   * - `'above'`      — strip rendered above the toolbar
+   * - `'toolbar'`    — left side of the built-in toolbar
+   * - `'below'`      — strip rendered below the paginator
+   * - `'row-inline'` — icon button(s) on every row, in an auto-injected sticky-end column
+   * - `'row-menu'`   — items in a ⋯ overflow menu in the same column
+   */
+  readonly actions = input<TableAction<T>[]>([]);
+
+  // ---- pagination state ----
+
+  /** Tracks the active page size so effective-length can be recomputed on page-size change. */
+  private readonly _activePageSize = signal(
+    this.tableConfig().paginationOptions?.defaultPageSize ?? 10,
+  );
+
+  /**
+   * The length value actually bound to mat-paginator.
+   * - Known total (length > 0): passed straight through.
+   * - Unknown total (length === 0, server-side): inferred from the current page's row count.
+   *   If the page is full (rows === pageSize) we assume more pages exist and set length one
+   *   item beyond the current page end, keeping the next button enabled. If the page is
+   *   short (rows < pageSize) we set length to exactly the current page end, disabling next.
+   */
+  readonly _effectiveLength = computed(() => {
+    if (this.length() > 0) return this.length();
+    // unknown total — infer from current page data
+    const idx     = this.pageIndex() ?? 0;
+    const size    = this._activePageSize();
+    const rows    = this._data().length;
+    const hasNext = rows >= size;
+    return idx * size + rows + (hasNext ? 1 : 0);
+  });
 
   // ---- outputs ----
 
@@ -245,10 +285,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     const hasSelect = this.tableColumns().some((c) => c.key === 'select');
     const visible = order.filter((key) => !hidden.has(key));
     const base = hasSelect ? ['select', ...visible] : visible;
-    if (this._fillerActive()) {
-      return [...base, SIMPLE_TABLE_LAYOUT_FILLER_COLUMN];
-    }
-    return base;
+    // Filler absorbs remaining width in the scrollable area; row-actions is stickyEnd after it.
+    const withFiller = this._fillerActive() ? [...base, SIMPLE_TABLE_LAYOUT_FILLER_COLUMN] : base;
+    return this._hasRowActions() ? [...withFiller, ST_ROW_ACTIONS_COLUMN] : withFiller;
   });
 
   // ---- toolbar visibility (opt-out: undefined = on, false = off) ----
@@ -256,8 +295,27 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly _showColumnChooser = computed(() => this.tableConfig().showColumnChooser !== false);
   readonly _showRefresh = computed(() => this.tableConfig().showRefresh !== false);
   readonly _showExport = computed(() => !!this._exportDirective());
+
+  // ---- actions (grouped by position) ----
+
+  /** Exposed so the template can reference the internal column key. */
+  readonly rowActionsColumnDef = ST_ROW_ACTIONS_COLUMN;
+
+  readonly _toolbarActions  = computed(() => this.actions().filter(a => a.position === 'toolbar'));
+  readonly _aboveActions    = computed(() => this.actions().filter(a => a.position === 'above'));
+  readonly _belowActions    = computed(() => this.actions().filter(a => a.position === 'below'));
+  readonly _rowInlineActions = computed(() => this.actions().filter(a => a.position === 'row-inline'));
+  readonly _rowMenuActions   = computed(() => this.actions().filter(a => a.position === 'row-menu'));
+  /** True when any row-level actions are defined — causes the actions column to appear in _headers(). */
+  readonly _hasRowActions    = computed(() => this._rowInlineActions().length > 0 || this._rowMenuActions().length > 0);
+
   readonly _hasToolbar = computed(
-    () => this._showColumnChooser() || this._showRefresh() || this._showExport(),
+    () =>
+      this._showColumnChooser() ||
+      this._showRefresh() ||
+      this._showExport() ||
+      this._toolbarActions().length > 0 ||
+      this._aboveActions().length > 0,
   );
 
   // ---- drag / resize feature flags (opt-out) ----
@@ -299,6 +357,22 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       if (this.tableConfig().clientSide) {
         this._matDs.data = this._data();
       }
+    });
+    // in server-side mode with no known total, hide the "of X" from the range label
+    effect(() => {
+      const unknownTotal = !this.tableConfig().clientSide && this.length() === 0;
+      if (unknownTotal) {
+        const rows = this._data().length;
+        this._paginatorIntl.getRangeLabel = (page, pageSize) => {
+          if (rows === 0) return '0';
+          const start = page * pageSize + 1;
+          const end   = page * pageSize + rows;
+          return `${start} – ${end}`;
+        };
+      } else {
+        this._paginatorIntl.getRangeLabel = new MatPaginatorIntl().getRangeLabel;
+      }
+      this._paginatorIntl.changes.next();
     });
     // in server-side mode, sync the paginator's visual page when the host resets the index
     // (e.g. after a sort or filter change). Setting pageIndex directly does not emit a (page)
@@ -689,6 +763,28 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     return null;
   }
 
+  /**
+   * Returns the rows currently visible in the table.
+   * In client-side mode this is the current page slice from MatTableDataSource.
+   * In server-side mode it is the full _data() array (the host already sliced it).
+   */
+  private _visibleRows(): T[] {
+    if (this.tableConfig().clientSide) {
+      const paginator = this._paginatorRef();
+      if (!paginator) return this._matDs.data;
+      const start = paginator.pageIndex * paginator.pageSize;
+      return this._matDs.data.slice(start, start + paginator.pageSize);
+    }
+    return this._data();
+  }
+
+  /** Wires the SelectionModel change event to the selectionChange output. */
+  private _subscribeToSelection(): void {
+    this.selection.changed
+      .pipe(takeUntilDestroyed(this._destroyRef))
+      .subscribe(() => this.selectionChange.emit(this.selection.selected));
+  }
+
   onResizeStart(event: MouseEvent, colKey: string): void {
     event.preventDefault();
     event.stopPropagation();
@@ -702,7 +798,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
     const onMove = (e: MouseEvent): void => {
       const widths = new Map(this._columnWidths());
-      widths.set(colKey, Math.max(50, startW + e.clientX - startX));
+      const newW = Math.max(40, startW + e.clientX - startX);
+      widths.set(colKey, newW);
       this._columnWidths.set(widths);
     };
 
@@ -716,37 +813,10 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     document.addEventListener('mouseup', onUp);
   }
 
-  // ---- selection ----
-
-  private _subscribeToSelection(): void {
-    this.selection.changed
-      .pipe(takeUntilDestroyed(this._destroyRef))
-      .subscribe((change: SelectionChange<T>) => {
-        this.selectionChange.emit(change.source.selected);
-      });
-  }
-
-  /**
-   * In server-side mode the host already passes only the current page slice, so
-   * _data() is the right reference. In client-side mode MatTableDataSource owns
-   * paging, so we derive the visible rows from its paginator instead.
-   */
-  private _visibleRows(): T[] {
-    if (this.tableConfig().clientSide) {
-      const p = this._matDs.paginator;
-      if (p) {
-        const start = p.pageIndex * p.pageSize;
-        return this._matDs.filteredData.slice(start, start + p.pageSize);
-      }
-      return this._matDs.filteredData;
-    }
-    return this._data();
-  }
+  // ---- selection helpers ----
 
   isAllSelected(): boolean {
-    const rows = this._visibleRows();
-    if (!rows.length) return false;
-    return rows.every((r) => this.selection.isSelected(r));
+    return this._visibleRows().every(row => this.selection.isSelected(row));
   }
 
   masterToggle(): void {
@@ -760,14 +830,15 @@ export class SimpleTableComponent<T> implements AfterContentInit {
 
   checkboxLabel(row?: T): string {
     if (!row) {
-      return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
+      return this.isAllSelected() ? 'deselect all' : 'select all';
     }
-    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row`;
+    return this.selection.isSelected(row) ? 'deselect row' : 'select row';
   }
 
   // ---- pagination ----
 
   onPageChange(event: PageEvent): void {
+    this._activePageSize.set(event.pageSize);
     this.selection.clear();
     this.page.emit(event);
   }

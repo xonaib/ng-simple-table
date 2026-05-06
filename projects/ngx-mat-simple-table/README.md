@@ -1,6 +1,6 @@
 # simple-table
 
-A reusable, declarative Angular Material data table built with Angular 21. Configure columns with a JSON array, get sorting, multi-select, dropdown filters, pagination, sticky columns, theming, and dark mode out of the box — with an escape hatch for custom cell templates. Zero third-party dependencies beyond Angular Material.
+A reusable, declarative Angular Material data table built with Angular 21. Configure columns with a JSON array, get sorting, multi-select, dropdown filters, pagination, sticky columns, row actions, theming, and dark mode out of the box — with an escape hatch for custom cell templates. Zero third-party dependencies beyond Angular Material.
 
 | | |
 | --- | --- |
@@ -23,6 +23,7 @@ Each column is identified by a **`key`** string: it is both the `matColumnDef` i
 | Row selection | Multi-select checkboxes, master toggle, `selectionChange` output |
 | Dropdown column filters | Distinct values built from `dataSource`; Apply/Clear emits `(filterChange)` |
 | Pagination | `MatPaginator` with configurable page sizes; server- and client-side modes |
+| Unknown-total pagination | Omit `[length]` in server-side mode — next/prev inferred automatically from page row count |
 | Sticky columns | `ColumnDef.sticky: 'left' \| 'right'` — pins columns to either edge; drag-reorder is disabled for sticky columns |
 | Fill-container height | `TableConfig.fillContainer: true` — table expands to fill its parent; toolbar and paginator always stay in view |
 | Column widths | Optional `width` on `ColumnDef` (`number` = px, `string` = CSS). Resize overrides at runtime |
@@ -32,9 +33,10 @@ Each column is identified by a **`key`** string: it is both the `matColumnDef` i
 | `displayValue` | Per-column `(value, row) => string` transform for formatting or derived display text |
 | `cellClass` | Per-column `(value, row) => string \| string[]` for conditional cell styling (status badges, colour-coded priority, etc.) |
 | Custom cell templates | `cellDef` attribute on `<ng-template>` — value must match the column `key` |
+| **Row & global actions** | Declarative `TableAction[]` with five position slots — see [Actions](#actions) |
 | State persistence | `StStateStoringDirective` saves column order, visibility, and widths to `localStorage` |
 | Export to Excel | `StExportDirective` with full XLSX via ExcelJS; export all records via `allDataProvider` |
-| CSS theming | 14 `--st-*` custom properties for colours, borders, font, row height, scrollbar, and sticky cells |
+| CSS theming | 20+ `--st-*` custom properties for colours, borders, font, row height, scrollbar, and sticky cells |
 | Dark mode | Set `body { color-scheme: dark }` — all `--st-*` tokens and Angular Material tokens flip automatically |
 | OnPush + signals | `ChangeDetectionStrategy.OnPush` throughout; zero `ChangeDetectorRef` usage |
 
@@ -55,6 +57,7 @@ import {
   ColumnDef,
   FilterType,
   TableConfig,
+  TableAction,
 } from 'ngx-mat-simple-table';
 
 columns: ColumnDef[] = [
@@ -88,11 +91,14 @@ tableConfig: TableConfig = {
   [tableConfig]="tableConfig"
   [length]="totalCount"
   [stickyHeaders]="true"
+  [actions]="tableActions"
   (page)="onPage($event)"
   (sortChange)="onSort($event)"
   (filterChange)="onFilter($event)"
   (selectionChange)="onSelect($event)"
 >
+  <st-state-storing />
+  <st-export [allDataProvider]="getAllForExport" />
 </simple-table>
 ```
 
@@ -114,6 +120,88 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 
 > **Tip:** `cellClass` on `ColumnDef` handles most styling-only cases without a template — reserve `cellDef` for when you need actual HTML structure.
 
+## Actions
+
+Pass a `TableAction<T>[]` array to `[actions]`. Each action specifies a `position` that controls where it renders.
+
+```typescript
+import { TableAction } from 'ngx-mat-simple-table';
+
+readonly actions: TableAction<Row>[] = [
+  // toolbar — left side of the toolbar row
+  {
+    id: 'add',
+    label: 'New item',
+    icon: 'add',
+    position: 'toolbar',
+    color: 'primary',
+    variant: 'flat',
+    cb: () => this.openCreateDialog(),
+  },
+  {
+    id: 'bulk-delete',
+    label: 'Delete selected',
+    icon: 'delete_sweep',
+    position: 'toolbar',
+    color: 'warn',
+    variant: 'stroked',
+    disabled: () => this.selected().length === 0,
+    cb: () => this.bulkDelete(this.selected()),
+  },
+
+  // row-inline — icon button on every row
+  {
+    id: 'edit',
+    label: 'Edit',
+    icon: 'edit',
+    position: 'row-inline',
+    cb: row => this.openEditDialog(row),
+  },
+
+  // row-menu — items in the ⋯ overflow menu
+  {
+    id: 'duplicate',
+    label: 'Duplicate',
+    icon: 'content_copy',
+    position: 'row-menu',
+    cb: row => this.duplicate(row),
+  },
+
+  // below — rendered on the left of the paginator row
+  {
+    id: 'export-selected',
+    label: 'Export selected',
+    icon: 'file_download',
+    position: 'below',
+    disabled: () => this.selected().length === 0,
+    cb: () => this.exportSelected(this.selected()),
+  },
+];
+```
+
+### Action positions
+
+| Position | Where it renders |
+| --- | --- |
+| `'toolbar'` | Left side of the toolbar row (Column Chooser / Export / Refresh icons stay right) |
+| `'above'` | Also merged into the toolbar left side |
+| `'below'` | Left of the paginator row as a styled button |
+| `'row-inline'` | Icon button visible on every data row (sticky-end column) |
+| `'row-menu'` | Item inside the ⋯ overflow menu in the same sticky-end column |
+
+### `TableAction<T>` properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | Unique key (track identity, not displayed). |
+| `label` | `string?` | Button text. Optional — omit for icon-only with tooltip. |
+| `icon` | `string?` | Material icon name. |
+| `position` | `ActionPosition` | Where the action renders (see table above). |
+| `cb` | `(row: T \| undefined) => void` | Callback. `row` is the clicked row for `row-inline`/`row-menu`; `undefined` for all others. |
+| `disabled` | `(row?: T) => boolean` | Return `true` to disable. |
+| `color` | `'primary' \| 'accent' \| 'warn'` | Material button colour. |
+| `variant` | `'flat' \| 'stroked' \| 'text' \| 'icon'` | Button style for non-row positions. Defaults to `'stroked'`. Omitting `label` also forces icon-only. |
+
 ## Column definition (`ColumnDef`)
 
 | Property | Type | Description |
@@ -125,10 +213,11 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `sortable` | `boolean` | Set `false` to disable sorting. Omitted = sortable. `select` is never sortable. |
 | `hasColumnFilters` | `boolean` | Shows the filter icon and builds a dropdown from distinct values. |
 | `filterType` | `FilterType` | `FilterType.DropDown` — checkbox list with search. |
-| `displayValue` | `(value, row) => string` | Transform the displayed cell text (formatting, derived values). |
+| `displayValue` | `(value, row) => unknown` | Transform the displayed cell text (formatting, derived values). Also used for export unless `exportValue` is set. |
+| `exportValue` | `(value, row) => unknown` | Export-only override. Use when the cell needs rich rendering in the grid but plain text in the file. |
 | `cellClass` | `(value, row) => string \| string[] \| null` | Return a CSS class or array of classes to apply to the body cell. |
 
-**Reserved key:** `st-layout-filler` is used internally — do not use it as a column key.
+**Reserved keys:** `select`, `st-layout-filler`, `st-row-actions` are used internally — do not use them as column keys.
 
 ## Table config (`TableConfig`)
 
@@ -139,12 +228,10 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `clientSide` | `boolean` | `false` | Hand sorting, filtering, and pagination to an internal `MatTableDataSource`. |
 | `horizontalScroll` | `boolean` | `false` | Enable horizontal scroll on the table wrapper. |
 | `fillContainer` | `boolean` | `false` | Stretch the table to fill its parent height; toolbar and paginator stay in view. |
-| `stickyToolbar` | `boolean` | `false` | Stick the toolbar row (column chooser / export / refresh) to the top. |
 | `showColumnChooser` | `boolean` | `true` | Show the column-chooser button. |
-| `showExport` | `boolean` | `true` | Show the export button (requires `StExportDirective`). |
-| `showRefresh` | `boolean` | `false` | Show the refresh button. |
-| `isDraggable` | `boolean` | `true` | Enable column drag-reorder. |
-| `isResizable` | `boolean` | `true` | Enable column resize handles. |
+| `showRefresh` | `boolean` | `true` | Show the refresh button. |
+| `columnDraggable` | `boolean` | `true` | Enable column drag-reorder. |
+| `columnResizable` | `boolean` | `true` | Enable column resize handles. |
 | `maxHeight` | `string` | — | CSS max-height on the scroll wrapper (ignored when `fillContainer` is true). |
 
 ## Inputs
@@ -155,10 +242,11 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `tableColumns` | `ColumnDef[]` | — | Column definitions. Required. |
 | `tableConfig` | `TableConfig` | `{}` | Pagination, scroll, toolbar, drag/resize flags. |
 | `tableId` | `string` | — | Unique key for `StStateStoringDirective` persistence. |
-| `length` | `number` | `0` | Total row count for the paginator (server-side). |
+| `length` | `number` | `0` | Total row count for server-side pagination. Omit or pass `0` to enable auto next/prev detection. |
 | `pageIndex` | `number` | — | Sync paginator when the host resets the page (server-side). |
 | `selectedRows` | `T[]` | — | Pre-select rows programmatically. |
 | `stickyHeaders` | `boolean` | `false` | Sticky header row. |
+| `actions` | `TableAction<T>[]` | `[]` | Declarative action buttons. |
 
 ## Outputs
 
@@ -171,6 +259,17 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `refresh` | `void` | Refresh toolbar button clicked. |
 | `columnOrderChange` | `string[]` | Data column keys after header drag-reorder. |
 | `columnWidthChange` | `Record<string, number>` | Column widths in px after resize. |
+| `dataExport` | `string` | CSV string emitted when the export button is clicked (if no `StExportDirective`). |
+
+## Pagination — unknown total
+
+In server-side mode, if your API does not return a total count, simply omit `[length]` (or pass `0`). The component infers whether a next page exists from the current page's row count:
+
+- **Page is full** (rows returned = page size) → next button enabled
+- **Page is short** (rows returned < page size) → next button disabled, last page reached
+- The range label shows `"1 – 25"` instead of `"1 – 25 of 0"`
+
+No extra inputs or configuration needed.
 
 ## Theming
 
@@ -223,7 +322,6 @@ simple-table {
 All defaults alias Angular Material's `--mat-sys-*` tokens, so the full table adapts automatically when you switch `color-scheme`:
 
 ```typescript
-// toggle dark/light at runtime
 document.body.style.colorScheme = 'dark'; // or 'light'
 ```
 
@@ -320,7 +418,6 @@ npm run publish:lib # runs build:lib then publishes dist/ngx-mat-simple-table to
 **v1.3**
 
 - Virtual scrolling for large datasets
-- `TableConfig.scrollbarVisibility: 'auto' | 'always' | 'hover'`
 - Date range filter type
 - Inline row editing
 - Storybook stories
@@ -336,6 +433,17 @@ MIT
 ---
 
 ## Release Notes
+
+### v1.2.2
+
+- **Declarative actions** — `TableAction<T>[]` input with five position slots: `toolbar`, `above` (merged into toolbar), `below` (rendered left of paginator row), `row-inline` (icon button per row), `row-menu` (⋯ overflow menu per row)
+- **Optional `label` on actions** — omit `label` to force icon-only rendering with an automatic tooltip; both `label` and `icon` are optional but at least one should be set
+- **`cb` callback** — action callback renamed from `handler` to `cb` for brevity
+- **Unified toolbar row** — `above` and `toolbar` actions render together on the left of a single toolbar row; built-in icons (Column Chooser, Export, Refresh) stay right with tooltips
+- **Paginator row merged with below actions** — `below` actions appear as styled buttons on the left of the paginator row, eliminating the separate strip below the table
+- **Unknown-total pagination** — omit `[length]` in server-side mode; next/prev buttons are inferred automatically from page row count; range label shows `"X – Y"` instead of `"X – Y of 0"`
+- **Tooltips on built-in toolbar buttons** — Column Chooser, Export, and Refresh icons now show tooltips on hover
+- **`MatTooltipModule`** added to library imports
 
 ### v1.2.1
 

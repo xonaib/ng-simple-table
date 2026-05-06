@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Medium Article</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 740px; margin: 60px auto; font-size: 18px; line-height: 1.7; color: #292929; }
+    h1 { font-size: 36px; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
+    h2 { font-size: 26px; font-weight: 700; margin-top: 48px; margin-bottom: 16px; }
+    p { margin: 0 0 24px; }
+    pre { background: #f5f5f5; border-radius: 4px; padding: 20px 24px; overflow-x: auto; font-size: 14px; line-height: 1.6; margin: 0 0 24px; }
+    code { font-family: "SF Mono", "Fira Code", Consolas, monospace; }
+    pre code { font-family: "SF Mono", "Fira Code", Consolas, monospace; }
+    hr { border: none; border-top: 1px solid #e0e0e0; margin: 48px 0; }
+    ul { margin: 0 0 24px; padding-left: 28px; }
+    li { margin-bottom: 8px; }
+    em { font-style: italic; }
+    strong { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<h1>I got tired of rebuilding the same Angular table every project, so I made a library</h1>
+
+<p>Every Angular project I've worked on has a table. Usually more than one. And every single time, I end up writing the same boilerplate — <code>MatTableDataSource</code>, paginator, sort, filter inputs, loading state, column definitions... it's a lot of setup for something that should be straightforward.</p>
+
+<p>After doing it the fourth time, I decided to just extract it into a library.</p>
+
+<p>It's called <strong>ngx-mat-simple-table</strong>. It wraps Angular Material's <code>mat-table</code> in a clean, declarative API so you get sorting, filtering, pagination, multi-select, and more — without writing a wall of template code every time.</p>
+
+<hr />
+
+<h2>The problem with mat-table</h2>
+
+<p>Angular Material's table is actually pretty powerful. But it's also very low-level. You define every column manually, wire up your own paginator, create your own filter logic, manage selection state yourself... and most of the time you're just doing the same thing you did in the last project.</p>
+
+<p>Here's roughly what a "basic" table with sorting, pagination, and a search filter looks like out of the box:</p>
+
+<pre><code>&lt;mat-form-field&gt;
+  &lt;input matInput (keyup)="applyFilter($event)" placeholder="Search" /&gt;
+&lt;/mat-form-field&gt;
+
+&lt;table mat-table [dataSource]="dataSource" matSort&gt;
+  &lt;ng-container matColumnDef="name"&gt;
+    &lt;th mat-header-cell *matHeaderCellDef mat-sort-header&gt;Name&lt;/th&gt;
+    &lt;td mat-cell *matCellDef="let row"&gt;{{ row.name }}&lt;/td&gt;
+  &lt;/ng-container&gt;
+  &lt;!-- ...repeat for every column... --&gt;
+  &lt;tr mat-header-row *matHeaderRowDef="displayedColumns"&gt;&lt;/tr&gt;
+  &lt;tr mat-row *matRowDef="let row; columns: displayedColumns;"&gt;&lt;/tr&gt;
+&lt;/table&gt;
+
+&lt;mat-paginator [pageSizeOptions]="[10, 25, 50]"&gt;&lt;/mat-paginator&gt;</code></pre>
+
+<p>And that's before you add selection, column-level filters, sticky headers, or a loading indicator. It compounds fast.</p>
+
+<hr />
+
+<h2>What simple-table looks like instead</h2>
+
+<p>With <code>ngx-mat-simple-table</code>, the same table is:</p>
+
+<pre><code>&lt;simple-table
+  [dataSource]="tasks"
+  [tableColumns]="columns"
+  [tableConfig]="config"
+&gt;
+&lt;/simple-table&gt;</code></pre>
+
+<p>You define your columns once in the component:</p>
+
+<pre><code>columns: ColumnDef[] = [
+  { key: 'id',       label: 'ID',       sortable: true },
+  { key: 'title',    label: 'Title',    sortable: true, filterable: true },
+  { key: 'status',   label: 'Status',   sortable: true, filterable: true },
+  { key: 'priority', label: 'Priority', cellClass: (row) => `priority-${row.priority}` },
+];
+
+config: TableConfig = {
+  selectable: true,
+  pagination: { pageSizeOptions: [10, 25, 50], defaultPageSize: 25 },
+};</code></pre>
+
+<p>That's it. Sorting, per-column dropdown filters, pagination, and row selection are all wired up automatically.</p>
+
+<hr />
+
+<h2>Custom cells when you need them</h2>
+
+<p>The declarative API covers most cases, but sometimes you need custom rendering — a link, a badge, a formatted date. You can drop in a template for any column without losing the auto-generated header (so <code>mat-sort-header</code> still works):</p>
+
+<pre><code>&lt;simple-table [dataSource]="tasks" [tableColumns]="columns" [tableConfig]="config"&gt;
+  &lt;ng-template cellDef="title" let-row&gt;
+    &lt;a [routerLink]="['/tasks', row.id]"&gt;{{ row.title }}&lt;/a&gt;
+  &lt;/ng-template&gt;
+&lt;/simple-table&gt;</code></pre>
+
+<p>Everything else stays automatic. You only opt in to custom rendering where you actually need it.</p>
+
+<hr />
+
+<h2>Server-side mode</h2>
+
+<p>For larger datasets you'll want server-side pagination, sorting, and filtering. The component handles that too — you just provide an observable as the data source and wire up the events:</p>
+
+<pre><code>(page)="onPage($event)"
+(sortChange)="onSort($event)"
+(filterChange)="onFilter($event)"</code></pre>
+
+<p>Each event gives you the current state, so you can build your API params and feed the response back in. The component tracks loading state so you can show a progress bar in the meantime.</p>
+
+<hr />
+
+<h2>The theming story</h2>
+
+<p>This is the part I'm actually most happy with.</p>
+
+<p>Angular Material 3 uses CSS custom properties (system tokens like <code>--mat-sys-primary</code>) for everything. <code>simple-table</code> builds on top of that — all the visual properties are exposed as CSS variables you can override per-instance or globally:</p>
+
+<pre><code>simple-table {
+  --st-row-bg: #f8fafc;
+  --st-row-hover-bg: #e2e8f0;
+  --st-header-bg: #1e293b;
+  --st-header-color: #f1f5f9;
+  --st-border-color: #cbd5e1;
+  --st-selected-row-bg: #dbeafe;
+}</code></pre>
+
+<p>There are about 22 tokens in total — row backgrounds, hover states, selection colours, header, border, sticky column background, cell colour. If you don't set any of them, they fall back to the Material 3 system tokens so they work with whatever theme you're already using.</p>
+
+<p>Dark mode works automatically if you set <code>color-scheme: dark</code> on the body. The Material tokens switch, and any <code>light-dark()</code> values in your custom cell styles adapt with them. No JavaScript needed for the colour switching — just CSS.</p>
+
+<hr />
+
+<h2>Other bits worth mentioning</h2>
+
+<ul>
+  <li><strong>Column reordering</strong> — drag and drop headers to rearrange columns. CDK-powered.</li>
+  <li><strong>Column resizing</strong> — drag the right edge of any header to resize.</li>
+  <li><strong>State persistence</strong> — drop in <code>&lt;st-state-storing /&gt;</code> and the component saves column order, widths, and active filters to localStorage automatically.</li>
+  <li><strong>Export to Excel</strong> — <code>&lt;st-export [allDataProvider]="getAllRows" /&gt;</code> adds an export button. Uses <code>exceljs</code> (optional peer dep).</li>
+  <li><strong>Sticky headers and columns</strong> — <code>[stickyHeaders]="true"</code> and <code>sticky: true</code> on a column def.</li>
+  <li><strong>Client-side mode</strong> — pass a plain array and the component handles sort, filter, and pagination internally with <code>MatTableDataSource</code>.</li>
+</ul>
+
+<hr />
+
+<h2>Installing it</h2>
+
+<pre><code>npm install ngx-mat-simple-table</code></pre>
+
+<p>Peer deps are Angular 21+ and Angular Material 21+. <code>exceljs</code> is optional — only needed if you use the export feature.</p>
+
+<p>Then import <code>SimpleTableComponent</code> and the directives you need:</p>
+
+<pre><code>import { SimpleTableComponent, CellDefDirective, StStateStoringComponent } from 'ngx-mat-simple-table';</code></pre>
+
+<hr />
+
+<h2>Where to find it</h2>
+
+<ul>
+  <li><strong>npm</strong>: <a href="https://www.npmjs.com/package/ngx-mat-simple-table">npmjs.com/package/ngx-mat-simple-table</a></li>
+  <li><strong>Live demo</strong>: <a href="https://ng-simple-table.vercel.app">ng-simple-table.vercel.app</a></li>
+  <li><strong>GitHub</strong>: <a href="https://github.com/xonaib/ng-simple-table">github.com/xonaib/ng-simple-table</a></li>
+</ul>
+
+<p>The demo shows both client-side and server-side modes — you can toggle between them and see the filtering and pagination behaviour live. Feedback and issues welcome on GitHub. I built this to solve my own problem, but if it saves you some boilerplate too, that's the whole point.</p>
+
+</body>
+</html>

@@ -1,6 +1,5 @@
 /**
  * CSS custom properties for theming ngx-mat-simple-table.
- * Override any of these on the <simple-table> element or a parent selector.
  *
  * --st-header-bg          Header row background colour
  * --st-header-color       Header row text colour
@@ -9,24 +8,14 @@
  * --st-row-selected-bg    Selected row background
  * --st-row-height         Row height (min-height)
  * --st-font-size          Cell font size
- * --st-cell-color          Body cell text colour
- * --st-row-bg              Body row background (non-hover, non-selected)
+ * --st-cell-color         Body cell text colour
+ * --st-row-bg             Body row background
  * --st-toolbar-bg         Toolbar background colour
- * --st-sticky-cell-bg     Body cell background for sticky (pinned) columns
- * --st-scrollbar-width      Scrollbar width (thin | auto | none)
- * --st-scrollbar-thumb      Scrollbar thumb colour
- * --st-scrollbar-track      Scrollbar track colour
- * --st-chooser-max-height   Max height of the column chooser list before it scrolls (default 320px)
- *
- * Filter popup (column-filter component):
- * --st-filter-popup-bg      Popup background
- * --st-filter-popup-border  Popup border colour
- * --st-filter-header-bg     Header strip background
- * --st-filter-header-color  Header strip text colour
- * --st-filter-footer-bg     Footer strip background
- * --st-filter-footer-border Footer strip top-border colour
- * --st-filter-input-bg      Search input background
- * --st-filter-input-border  Search input border colour
+ * --st-sticky-cell-bg     Body cell background for sticky columns
+ * --st-scrollbar-width    Scrollbar width (thin | auto | none)
+ * --st-scrollbar-thumb    Scrollbar thumb colour
+ * --st-scrollbar-track    Scrollbar track colour
+ * --st-chooser-max-height Max height of the column chooser list (default 320px)
  */
 
 :host {
@@ -39,7 +28,6 @@
     flex-direction: column;
   }
 
-  // ---- default token values (alias Material system tokens) ----
   --st-header-bg:         var(--mat-sys-surface-variant);
   --st-header-color:      var(--mat-sys-on-surface-variant);
   --st-border-color:      var(--mat-sys-outline-variant);
@@ -51,10 +39,10 @@
   --st-row-bg:            transparent;
   --st-toolbar-bg:        var(--mat-sys-surface);
   --st-sticky-cell-bg:    var(--mat-sys-surface-container);
-  --st-scrollbar-width:     thin;
-  --st-scrollbar-thumb:     var(--mat-sys-outline);
-  --st-scrollbar-track:     transparent;
-  --st-chooser-max-height:  320px;
+  --st-scrollbar-width:   thin;
+  --st-scrollbar-thumb:   var(--mat-sys-outline);
+  --st-scrollbar-track:   transparent;
+  --st-chooser-max-height: 320px;
 
   @media (max-width: 600px) {
     --st-chooser-max-height: 160px;
@@ -64,8 +52,6 @@
     --st-chooser-max-height: 220px;
   }
 }
-
-// ---- table wrapper (handles horizontal scroll and maxHeight) ----
 
 .st-table-wrapper {
   width: 100%;
@@ -78,23 +64,16 @@
     overflow-y: auto;
   }
 
-  // fillContainer mode: stretch to fill the host (which is a flex column) and scroll internally.
-  // The parent element must have a defined height for this to take effect.
   &.st-fill-container {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
 
-    // Draw a border under the last row so the empty space below doesn't look like a gap.
     table.simple-table {
       border-bottom: 1px solid var(--st-border-color);
     }
   }
-}
 
-// ---- table wrapper scrollbar styling ----
-
-.st-table-wrapper {
   scrollbar-width: var(--st-scrollbar-width);
   scrollbar-color: var(--st-scrollbar-thumb) var(--st-scrollbar-track);
 
@@ -111,18 +90,51 @@
   }
 }
 
+// ---- bottom row: below-position actions + paginator in one flex line ----
+
+.st-bottom-row {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--st-border-color);
+
+  mat-paginator {
+    flex: 1;
+    // reset the top border mat-paginator adds by default so our row border takes over
+    border-top: none;
+  }
+}
+
+.st-bottom-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
 // ---- toolbar ----
 
 .st-toolbar {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   padding: 4px 8px;
   border-bottom: 1px solid var(--st-border-color);
   background: var(--st-toolbar-bg);
 }
 
-// ---- column chooser (menu content stays in this component's template) ----
+.st-toolbar-custom-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.st-toolbar-builtins {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+// ---- column chooser ----
 
 .st-column-chooser-drop-list {
   min-width: 260px;
@@ -131,7 +143,6 @@
   overflow-y: auto;
 }
 
-// mat-mdc-menu-item is already display:flex; icon is projected before .mat-mdc-menu-item-text
 .st-column-chooser-handle {
   cursor: grab;
   color: var(--mat-sys-on-surface-variant);
@@ -158,29 +169,22 @@
   width: 100%;
   border-collapse: collapse;
 
-  // Shared with td + absolute header overlays (cdk drag root / placeholder) so text lines up
-  // with body cells: absolute children use the <th> padding *box* as CB, so inset:0 sits left of
-  // the real content box by padding-left -- mirror that inset here.
   --st-cell-pad-y: 10px;
   --st-cell-pad-x: 12px;
   --st-header-filter-pad-right: 44px;
   --st-header-filter-resize-inset: 36px;
 
-  // table-layout: fixed is required for <th> width to govern the full column
   &.resizable,
   &.st-table-fixed-layout {
     table-layout: fixed;
   }
 
-  // Auto columns need a floor or they collapse to 0px next to fixed-width peers / filler.
   &.st-table-fixed-layout {
     th.mat-mdc-header-cell.st-col-auto-width,
     td.mat-mdc-cell.st-col-auto-width {
       min-width: 5rem;
     }
   }
-
-  // ---- header ----
 
   th.mat-mdc-header-cell {
     background-color: var(--st-header-bg);
@@ -190,8 +194,6 @@
     position: relative;
     white-space: nowrap;
     overflow: hidden;
-    // Stable row height + positioning context: cdkDrag measures .st-header-drag-root; without
-    // this, % heights inside table cells collapse and the drag preview matchSize is too short.
     min-height: 48px;
     vertical-align: middle;
 
@@ -207,14 +209,12 @@
       transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
     }
 
-    // show filter icon on hover
     &:hover column-filter .filter-toggle,
     &.filter-applied column-filter .filter-toggle {
       opacity: 1;
     }
   }
 
-  // Inset by the same padding as the <th> so content aligns with td.mat-mdc-cell (CB is padding box).
   .st-header-drag-root {
     position: absolute;
     top: var(--st-cell-pad-y);
@@ -231,7 +231,6 @@
     gap: 10px;
   }
 
-  // Placeholder is portaled into the cell by CDK; same inset as drag root.
   th.mat-mdc-header-cell > .cdk-drag-placeholder.st-cdk-column-header-placeholder {
     inset: auto;
     top: var(--st-cell-pad-y);
@@ -248,8 +247,6 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-
-  // ---- resize handle ----
 
   .resize-handle {
     position: absolute;
@@ -286,8 +283,6 @@
     right: var(--st-header-filter-resize-inset);
   }
 
-  // ---- cells ----
-
   td.mat-mdc-cell {
     font-size: var(--st-font-size);
     color: var(--st-cell-color);
@@ -296,16 +291,9 @@
     transition: background-color 0.15s ease;
   }
 
-  // ---- sticky body cells ----
-
   td.mat-mdc-cell.st-col-sticky {
     background-color: var(--st-sticky-cell-bg);
   }
-
-  // ---- rows ----
-  // --st-row-bg lives on <tr> so it doesn't compete with cellClass backgrounds on <td>.
-  // Hover and selection target <td> directly so they override both normal and sticky
-  // cell backgrounds uniformly.
 
   tr.mat-mdc-row {
     cursor: pointer;
@@ -323,10 +311,6 @@
     background-color: var(--st-row-selected-bg);
   }
 
-  // ---- checkbox column ----
-  // MDC checkbox needs ~40px touch target; 40px col + default pad left 12px clipped the control.
-  // Header cells use overflow:hidden for drag headers -- allow visible overflow here only.
-
   th.mat-mdc-header-cell.mat-column-select,
   td.mat-mdc-cell.mat-column-select {
     width: 52px;
@@ -337,9 +321,6 @@
     vertical-align: middle;
   }
 
-  // Do not use width: 100% here -- under table-layout: fixed it steals the whole table and
-  // collapses sibling auto columns to 0. Remaining space is distributed to width:auto columns;
-  // this column is last and has min-width 0 so it tends to absorb the slack after auto mins.
   th.mat-mdc-header-cell.st-layout-filler,
   td.mat-mdc-cell.st-layout-filler {
     padding: 0;
@@ -347,10 +328,23 @@
     width: auto;
     min-width: 0;
   }
-}
 
-// ---- paginator ----
+  // ---- row-actions column ----
 
-mat-paginator {
-  border-top: 1px solid var(--st-border-color);
+  th.mat-mdc-header-cell.st-row-actions-header,
+  td.mat-mdc-cell.st-row-actions-cell {
+    width: 1px;
+    white-space: nowrap;
+    padding: 2px 4px;
+    overflow: visible;
+    text-align: right;
+    vertical-align: middle;
+    background-color: var(--st-sticky-cell-bg);
+  }
+
+  tr.mat-mdc-row:hover td.mat-mdc-cell.st-row-actions-cell,
+  tr.mat-mdc-row:hover td.mat-mdc-cell.st-row-actions-cell,
+  tr.mat-mdc-row.selected-row td.mat-mdc-cell.st-row-actions-cell {
+    background-color: inherit;
+  }
 }

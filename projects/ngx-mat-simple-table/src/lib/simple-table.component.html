@@ -1,57 +1,78 @@
 @if (_hasToolbar()) {
   <div class="st-toolbar">
-    @if (_showColumnChooser()) {
-      <button mat-icon-button [matMenuTriggerFor]="colMenu" aria-label="Choose columns">
-        <mat-icon>view_week</mat-icon>
-      </button>
-      <mat-menu #colMenu panelClass="st-column-chooser-panel">
-        <div
-          class="st-column-chooser-drop-list"
-          cdkDropList
-          cdkDropListOrientation="vertical"
-          (cdkDropListDropped)="onColumnChooserDrop($event)"
-        >
-          @for (col of _chooserColumnDefs(); track col.key) {
-            <div class="st-column-chooser-row" cdkDrag>
-              <button
-                mat-menu-item
-                type="button"
-                class="st-column-chooser-item"
-                (click)="$event.stopPropagation(); toggleColumn(col.key)"
-              >
-                <mat-icon
-                  cdkDragHandle
-                  class="st-column-chooser-handle"
-                  aria-label="Reorder column"
-                  tabindex="0"
-                  (pointerdown)="$event.stopPropagation()"
+    <!-- custom actions on the left: above + toolbar positions merged into one row -->
+    @if (_aboveActions().length > 0 || _toolbarActions().length > 0) {
+      <div class="st-toolbar-custom-actions">
+        @for (action of _aboveActions(); track action.id) {
+          <ng-container
+            [ngTemplateOutlet]="globalActionBtn"
+            [ngTemplateOutletContext]="{ $implicit: action }"
+          ></ng-container>
+        }
+        @for (action of _toolbarActions(); track action.id) {
+          <ng-container
+            [ngTemplateOutlet]="globalActionBtn"
+            [ngTemplateOutletContext]="{ $implicit: action }"
+          ></ng-container>
+        }
+      </div>
+    }
+
+    <!-- built-in controls pushed to the right via margin-left: auto -->
+    <div class="st-toolbar-builtins">
+      @if (_showColumnChooser()) {
+        <button mat-icon-button [matMenuTriggerFor]="colMenu" aria-label="Choose columns" matTooltip="Choose columns">
+          <mat-icon>view_week</mat-icon>
+        </button>
+        <mat-menu #colMenu panelClass="st-column-chooser-panel">
+          <div
+            class="st-column-chooser-drop-list"
+            cdkDropList
+            cdkDropListOrientation="vertical"
+            (cdkDropListDropped)="onColumnChooserDrop($event)"
+          >
+            @for (col of _chooserColumnDefs(); track col.key) {
+              <div class="st-column-chooser-row" cdkDrag>
+                <button
+                  mat-menu-item
+                  type="button"
+                  class="st-column-chooser-item"
+                  (click)="$event.stopPropagation(); toggleColumn(col.key)"
                 >
-                  drag_indicator
-                </mat-icon>
-                <mat-checkbox
-                  [checked]="!_hiddenColumns().has(col.key)"
-                  [disableRipple]="true"
-                  (change)="onColumnChooserCheckboxChange(col.key, $event)"
-                  (click)="$event.stopPropagation()"
-                >
-                  {{ col.label ?? col.key | titlecase }}
-                </mat-checkbox>
-              </button>
-            </div>
-          }
-        </div>
-      </mat-menu>
-    }
-    @if (_showExport()) {
-      <button mat-icon-button (click)="exportData()" aria-label="Export data">
-        <mat-icon>download</mat-icon>
-      </button>
-    }
-    @if (_showRefresh()) {
-      <button mat-icon-button (click)="refresh.emit()" aria-label="Refresh data">
-        <mat-icon>refresh</mat-icon>
-      </button>
-    }
+                  <mat-icon
+                    cdkDragHandle
+                    class="st-column-chooser-handle"
+                    aria-label="Reorder column"
+                    tabindex="0"
+                    (pointerdown)="$event.stopPropagation()"
+                  >
+                    drag_indicator
+                  </mat-icon>
+                  <mat-checkbox
+                    [checked]="!_hiddenColumns().has(col.key)"
+                    [disableRipple]="true"
+                    (change)="onColumnChooserCheckboxChange(col.key, $event)"
+                    (click)="$event.stopPropagation()"
+                  >
+                    {{ col.label ?? col.key | titlecase }}
+                  </mat-checkbox>
+                </button>
+              </div>
+            }
+          </div>
+        </mat-menu>
+      }
+      @if (_showExport()) {
+        <button mat-icon-button (click)="exportData()" aria-label="Export data" matTooltip="Export data">
+          <mat-icon>download</mat-icon>
+        </button>
+      }
+      @if (_showRefresh()) {
+        <button mat-icon-button (click)="refresh.emit()" aria-label="Refresh data" matTooltip="Refresh">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      }
+    </div>
   </div>
 }
 
@@ -62,158 +83,282 @@
   [class.st-has-max-height]="!_fillContainer() && !!_maxHeight()"
   [class.st-fill-container]="_fillContainer()"
 >
-<table
-  class="simple-table"
-  [class.resizable]="_isResizable()"
-  [class.st-table-fixed-layout]="_tableLayoutFixed()"
-  mat-table
-  [dataSource]="tableConfig().clientSide ? _matDs : _data()"
-  matSort
-  (matSortChange)="onSortChange($event)"
-  cdkDropListGroup
->
-  <!-- checkbox column — always locked, not draggable or resizable -->
-  <ng-container matColumnDef="select" [sticky]="true">
-    <th mat-header-cell *matHeaderCellDef [style.width]="effectiveWidthStyleForSelect()">
-      <mat-checkbox
-        (change)="$event ? masterToggle() : null"
-        [checked]="selection.hasValue() && isAllSelected()"
-        [indeterminate]="selection.hasValue() && !isAllSelected()"
-        [aria-label]="checkboxLabel()"
+  <table
+    class="simple-table"
+    [class.resizable]="_isResizable()"
+    [class.st-table-fixed-layout]="_tableLayoutFixed()"
+    mat-table
+    [dataSource]="tableConfig().clientSide ? _matDs : _data()"
+    matSort
+    (matSortChange)="onSortChange($event)"
+    cdkDropListGroup
+  >
+    <!-- checkbox column — always locked, not draggable or resizable -->
+    <ng-container matColumnDef="select" [sticky]="true">
+      <th mat-header-cell *matHeaderCellDef [style.width]="effectiveWidthStyleForSelect()">
+        <mat-checkbox
+          (change)="$event ? masterToggle() : null"
+          [checked]="selection.hasValue() && isAllSelected()"
+          [indeterminate]="selection.hasValue() && !isAllSelected()"
+          [aria-label]="checkboxLabel()"
+        >
+        </mat-checkbox>
+      </th>
+      <td
+        mat-cell
+        *matCellDef="let row"
+        class="st-col-sticky"
+        [style.width]="effectiveWidthStyleForSelect()"
       >
-      </mat-checkbox>
-    </th>
-    <td mat-cell *matCellDef="let row" class="st-col-sticky" [style.width]="effectiveWidthStyleForSelect()">
-      <mat-checkbox
-        (click)="$event.stopPropagation()"
-        (change)="$event ? selection.toggle(row) : null"
-        [checked]="selection.isSelected(row)"
-        [aria-label]="checkboxLabel(row)"
-      >
-      </mat-checkbox>
-    </td>
-  </ng-container>
+        <mat-checkbox
+          (click)="$event.stopPropagation()"
+          (change)="$event ? selection.toggle(row) : null"
+          [checked]="selection.isSelected(row)"
+          [aria-label]="checkboxLabel(row)"
+        >
+        </mat-checkbox>
+      </td>
+    </ng-container>
 
-  <!-- all data columns: always declare every matColumnDef so Material can restore hidden ones.
-       *ngFor (not &#64;for) is intentional — CDK + mat-table header cells.
+    <!-- all data columns: always declare every matColumnDef so Material can restore hidden ones.
+       *ngFor (not @for) is intentional — CDK + mat-table header cells.
        cdkDropList must live on <th> while cdkDrag wraps the cell contents: putting both on the
        same element makes previousContainer === container on every drop, so _columnOrder never
        updates and body columns stay out of sync with the header. -->
-  <ng-container
-    *ngFor="let column of _allDataColumns()"
-    [matColumnDef]="column.key"
-    [sticky]="column.sticky === 'left'"
-    [stickyEnd]="column.sticky === 'right'"
-  >
-    <th
-      mat-header-cell
-      *matHeaderCellDef
-      cdkDropList
-      cdkDropListOrientation="horizontal"
-      cdkDropListSortingDisabled
-      [cdkDropListData]="column.key"
-      [cdkDropListDisabled]="!_isDraggable()"
-      (cdkDropListDropped)="onColumnDrop($event)"
-      [class.filter-col]="column.hasColumnFilters"
-      [class.draggable]="_isDraggable()"
-      [class.st-col-sticky]="!!column.sticky"
-      [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
-      [style.width]="effectiveWidthStyleForDataColumn(column)"
+    <ng-container
+      *ngFor="let column of _allDataColumns()"
+      [matColumnDef]="column.key"
+      [sticky]="column.sticky === 'left'"
+      [stickyEnd]="column.sticky === 'right'"
     >
-      <div
-        class="st-header-drag-root"
-        cdkDrag
-        [cdkDragData]="column.key"
-        [cdkDragDisabled]="!_isDraggable() || !!column.sticky"
-        cdkDragLockAxis="x"
+      <th
+        mat-header-cell
+        *matHeaderCellDef
+        cdkDropList
+        cdkDropListOrientation="horizontal"
+        cdkDropListSortingDisabled
+        [cdkDropListData]="column.key"
+        [cdkDropListDisabled]="!_isDraggable()"
+        (cdkDropListDropped)="onColumnDrop($event)"
+        [class.filter-col]="column.hasColumnFilters"
+        [class.draggable]="_isDraggable()"
+        [class.st-col-sticky]="!!column.sticky"
+        [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
+        [style.width]="effectiveWidthStyleForDataColumn(column)"
       >
-        <!-- Custom preview: default clone is portaled to <body> and loses emulated-encapsulation
-             styles, so it looks like a tiny unstyled chip. matchSize keeps the real header bounds. -->
-        <ng-template cdkDragPreview matchSize>
-          <div class="st-cdk-column-header-preview">
-            {{ column.label ?? column.key | titlecase }}
-          </div>
-        </ng-template>
-
-        <!-- Custom placeholder: clone loses encapsulation styles and looks empty; in-table
-             horizontal sorting also applies translate3d to siblings, which breaks <th> layout. -->
-        <ng-template cdkDragPlaceholder>
-          <div class="st-cdk-column-header-placeholder" aria-hidden="true">
-            {{ column.label ?? column.key | titlecase }}
-          </div>
-        </ng-template>
-
-        <span
-          mat-sort-header
-          [disabled]="!isColumnSortable(column)"
-          class="st-header-sort-label"
+        <div
+          class="st-header-drag-root"
+          cdkDrag
+          [cdkDragData]="column.key"
+          [cdkDragDisabled]="!_isDraggable() || !!column.sticky"
+          cdkDragLockAxis="x"
         >
-          {{ column.label ?? column.key | titlecase }}
-        </span>
+          <!-- Custom preview: default clone is portaled to <body> and loses emulated-encapsulation
+             styles, so it looks like a tiny unstyled chip. matchSize keeps the real header bounds. -->
+          <ng-template cdkDragPreview matchSize>
+            <div class="st-cdk-column-header-preview">
+              {{ column.label ?? column.key | titlecase }}
+            </div>
+          </ng-template>
 
-        @if (column.hasColumnFilters) {
-          <column-filter
-            [filter]="columnFilters().get(column.key)"
-            [column]="column"
-            (filterApplied)="onFilterApplied(column.key, $event)"
-            (filterCleared)="onFilterCleared($event)"
-            (click)="$event.stopPropagation()"
-            (pointerdown)="$event.stopPropagation()"
+          <!-- Custom placeholder: clone loses encapsulation styles and looks empty; in-table
+             horizontal sorting also applies translate3d to siblings, which breaks <th> layout. -->
+          <ng-template cdkDragPlaceholder>
+            <div class="st-cdk-column-header-placeholder" aria-hidden="true">
+              {{ column.label ?? column.key | titlecase }}
+            </div>
+          </ng-template>
+
+          <span mat-sort-header [disabled]="!isColumnSortable(column)" class="st-header-sort-label">
+            {{ column.label ?? column.key | titlecase }}
+          </span>
+
+          @if (column.hasColumnFilters) {
+            <column-filter
+              [filter]="columnFilters().get(column.key)"
+              [column]="column"
+              (filterApplied)="onFilterApplied(column.key, $event)"
+              (filterCleared)="onFilterCleared($event)"
+              (click)="$event.stopPropagation()"
+              (pointerdown)="$event.stopPropagation()"
+            >
+            </column-filter>
+          }
+
+          @if (_isResizable()) {
+            <span
+              class="resize-handle"
+              (pointerdown)="$event.stopPropagation()"
+              (mousedown)="onResizeStart($event, column.key)"
+            ></span>
+          }
+        </div>
+      </th>
+      <td
+        mat-cell
+        *matCellDef="let row"
+        [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
+        [class.st-col-sticky]="!!column.sticky"
+        [style.width]="effectiveWidthStyleForDataColumn(column)"
+        [ngClass]="column.cellClass ? column.cellClass(row[column.key], row) : null"
+      >
+        @if (customCellTemplates.get(column.key); as cellTmpl) {
+          <ng-container
+            [ngTemplateOutlet]="cellTmpl"
+            [ngTemplateOutletContext]="{ $implicit: row }"
+          ></ng-container>
+        } @else {
+          {{ column.displayValue ? column.displayValue(row[column.key], row) : row[column.key] }}
+        }
+      </td>
+    </ng-container>
+
+    <!-- Internal only: absorbs remaining width when pinned columns are narrower than the host. -->
+    <ng-container [matColumnDef]="layoutFillerColumnDef">
+      <th mat-header-cell *matHeaderCellDef class="st-layout-filler" aria-hidden="true"></th>
+      <td mat-cell *matCellDef="let row" class="st-layout-filler" aria-hidden="true"></td>
+    </ng-container>
+
+    <!-- Row actions column — always registered with Material Table so it can be toggled in and out
+       of _headers() at runtime. The column is stickyEnd and only appears when _hasRowActions(). -->
+    <ng-container [matColumnDef]="rowActionsColumnDef" [stickyEnd]="true">
+      <th mat-header-cell *matHeaderCellDef class="st-row-actions-header" aria-hidden="true"></th>
+      <td
+        mat-cell
+        *matCellDef="let row"
+        class="st-row-actions-cell st-col-sticky"
+        (click)="$event.stopPropagation()"
+      >
+        @for (action of _rowInlineActions(); track action.id) {
+          <button
+            mat-icon-button
+            [color]="action.color ?? null"
+            [disabled]="action.disabled ? action.disabled(row) : false"
+            (click)="$event.stopPropagation(); action.cb(row)"
+            [attr.aria-label]="action.label ?? action.id"
+            [matTooltip]="action.label ?? action.id"
           >
-          </column-filter>
+            @if (action.icon) {
+              <mat-icon>{{ action.icon }}</mat-icon>
+            }
+          </button>
         }
-
-        @if (_isResizable()) {
-          <span
-            class="resize-handle"
-            (pointerdown)="$event.stopPropagation()"
-            (mousedown)="onResizeStart($event, column.key)"
-          ></span>
+        @if (_rowMenuActions().length > 0) {
+          <button
+            mat-icon-button
+            [matMenuTriggerFor]="rowActionsMenu"
+            (click)="$event.stopPropagation()"
+            aria-label="Row actions"
+          >
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #rowActionsMenu>
+            @for (action of _rowMenuActions(); track action.id) {
+              <button
+                mat-menu-item
+                [disabled]="action.disabled ? action.disabled(row) : false"
+                (click)="action.cb(row)"
+              >
+                @if (action.icon) {
+                  <mat-icon matMenuItemIcon>{{ action.icon }}</mat-icon>
+                }
+                <span>{{ action.label ?? action.id }}</span>
+              </button>
+            }
+          </mat-menu>
         }
-      </div>
-    </th>
-    <td
-      mat-cell
-      *matCellDef="let row"
-      [class.st-col-auto-width]="isAutoSizedDataColumn(column)"
-      [class.st-col-sticky]="!!column.sticky"
-      [style.width]="effectiveWidthStyleForDataColumn(column)"
-      [ngClass]="column.cellClass ? column.cellClass(row[column.key], row) : null"
-    >
-      @if (customCellTemplates.get(column.key); as cellTmpl) {
-        <ng-container
-          [ngTemplateOutlet]="cellTmpl"
-          [ngTemplateOutletContext]="{ $implicit: row }"
-        ></ng-container>
-      } @else {
-        {{ column.displayValue ? column.displayValue(row[column.key], row) : row[column.key] }}
-      }
-    </td>
-  </ng-container>
+      </td>
+    </ng-container>
 
-  <!-- Internal only: absorbs remaining width when pinned columns are narrower than the host. -->
-  <ng-container [matColumnDef]="layoutFillerColumnDef">
-    <th mat-header-cell *matHeaderCellDef class="st-layout-filler" aria-hidden="true"></th>
-    <td mat-cell *matCellDef="let row" class="st-layout-filler" aria-hidden="true"></td>
-  </ng-container>
-
-  <tr mat-header-row *matHeaderRowDef="_headers(); sticky: stickyHeaders()"></tr>
-  <tr
-    mat-row
-    *matRowDef="let row; columns: _headers()"
-    [class.selected-row]="selection.isSelected(row)"
-    (click)="selection.toggle(row)"
-  ></tr>
-</table>
+    <tr mat-header-row *matHeaderRowDef="_headers(); sticky: stickyHeaders()"></tr>
+    <tr
+      mat-row
+      *matRowDef="let row; columns: _headers()"
+      [class.selected-row]="selection.isSelected(row)"
+      (click)="selection.toggle(row)"
+    ></tr>
+  </table>
 </div>
 
-@if (tableConfig().isPaginated) {
-  <mat-paginator
-    [length]="tableConfig().clientSide ? _matDs.filteredData.length : length()"
-    [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"
-    [pageSizeOptions]="tableConfig().paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
-    (page)="onPageChange($event)"
-    showFirstLastButtons
-  >
-  </mat-paginator>
+<!-- ---- bottom row: below actions + paginator in one flex line ---- -->
+@if (tableConfig().isPaginated || _belowActions().length > 0) {
+  <div class="st-bottom-row">
+    @if (_belowActions().length > 0) {
+      <div class="st-bottom-actions">
+        @for (action of _belowActions(); track action.id) {
+          <ng-container
+            [ngTemplateOutlet]="globalActionBtn"
+            [ngTemplateOutletContext]="{ $implicit: action }"
+          ></ng-container>
+        }
+      </div>
+    }
+    @if (tableConfig().isPaginated) {
+      <mat-paginator
+        [length]="tableConfig().clientSide ? _matDs.filteredData.length : _effectiveLength()"
+        [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"
+        [pageSizeOptions]="tableConfig().paginationOptions?.pageSizeOptions ?? [5, 10, 25, 50]"
+        (page)="onPageChange($event)"
+        showFirstLastButtons
+      >
+      </mat-paginator>
+    }
+  </div>
 }
+
+<!-- ---- reusable button template for above / toolbar / below positions ----
+     Rendering rules:
+       - no label → always icon button, tooltip = action.id
+       - label + variant='icon' → icon button, tooltip = label
+       - label + variant='flat'|'text'|'stroked' (default) → labelled button with optional icon
+-->
+<ng-template #globalActionBtn let-action>
+  @if (!action.label || action.variant === 'icon') {
+    <button
+      mat-icon-button
+      [color]="action.color ?? null"
+      [disabled]="action.disabled ? action.disabled(undefined) : false"
+      (click)="action.cb(undefined)"
+      [attr.aria-label]="action.label ?? action.id"
+      [matTooltip]="action.label ?? action.id"
+    >
+      @if (action.icon) { <mat-icon>{{ action.icon }}</mat-icon> }
+    </button>
+  } @else {
+    @switch (action.variant ?? 'stroked') {
+      @case ('flat') {
+        <button
+          mat-flat-button
+          [color]="action.color ?? null"
+          [disabled]="action.disabled ? action.disabled(undefined) : false"
+          (click)="action.cb(undefined)"
+        >
+          @if (action.icon) { <mat-icon>{{ action.icon }}</mat-icon> }
+          {{ action.label }}
+        </button>
+      }
+      @case ('text') {
+        <button
+          mat-button
+          [color]="action.color ?? null"
+          [disabled]="action.disabled ? action.disabled(undefined) : false"
+          (click)="action.cb(undefined)"
+        >
+          @if (action.icon) { <mat-icon>{{ action.icon }}</mat-icon> }
+          {{ action.label }}
+        </button>
+      }
+      @default {
+        <button
+          mat-stroked-button
+          [color]="action.color ?? null"
+          [disabled]="action.disabled ? action.disabled(undefined) : false"
+          (click)="action.cb(undefined)"
+        >
+          @if (action.icon) { <mat-icon>{{ action.icon }}</mat-icon> }
+          {{ action.label }}
+        </button>
+      }
+    }
+  }
+</ng-template>

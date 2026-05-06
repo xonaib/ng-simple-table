@@ -16,6 +16,7 @@ import {
   ColumnDef,
   FilterType,
   ItemParent,
+  TableAction,
   TableConfig,
 } from 'ngx-mat-simple-table';
 import { Task, TASKS } from './demo-data';
@@ -157,6 +158,64 @@ export class DemoTablePageComponent {
 
   readonly selectedTasks = signal<Task[]>([]);
 
+  // ---- actions ----
+
+  readonly tableActions: TableAction<Task>[] = [
+    // 'toolbar' — rendered on the left of the toolbar row
+    {
+      id: 'add',
+      label: 'New task',
+      icon: 'add',
+      position: 'toolbar',
+      color: 'primary',
+      variant: 'flat',
+      cb: () => console.log('[demo] add task'),
+    },
+    {
+      id: 'bulk-delete',
+      label: 'Delete selected',
+      icon: 'delete_sweep',
+      position: 'toolbar',
+      color: 'warn',
+      variant: 'stroked',
+      disabled: () => this.selectedTasks().length === 0,
+      cb: () => console.log('[demo] bulk delete', this.selectedTasks()),
+    },
+    // 'row-inline' — icon button visible on every row
+    {
+      id: 'edit',
+      label: 'Edit',
+      icon: 'edit',
+      position: 'row-inline',
+      cb: (row) => console.log('[demo] edit', row),
+    },
+    // 'row-menu' — items in the ⋯ overflow menu
+    {
+      id: 'duplicate',
+      label: 'Duplicate',
+      icon: 'content_copy',
+      position: 'row-menu',
+      cb: (row) => console.log('[demo] duplicate', row),
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: 'delete',
+      position: 'row-menu',
+      color: 'warn',
+      cb: (row) => console.log('[demo] delete', row),
+    },
+    // 'below' — rendered on the left of the paginator row
+    {
+      id: 'export-custom',
+      label: 'Export selected',
+      icon: 'file_download',
+      position: 'below',
+      disabled: () => this.selectedTasks().length === 0,
+      cb: () => console.log('[demo] export selected', this.selectedTasks()),
+    },
+  ];
+
   // ---- event handlers ----
 
   onPage(event: PageEvent): void {
@@ -191,15 +250,7 @@ export class DemoTablePageComponent {
     console.log('[demo] column widths:', widths);
   }
 
-  /**
-   * Fetches ALL records for export (unpaginated). Passes active filters and sort so the
-   * exported file reflects what the user sees — just without the page limit.
-   * Provided to <st-export [allDataProvider]="getAllForExport"> as an arrow function so
-   * `this` is captured correctly.
-   */
   readonly getAllForExport = (): Promise<Task[]> => {
-    // Omit page/size so the interceptor returns all matching records unpaginated.
-    // Active filters and sort are forwarded so the export reflects exactly what the user sees.
     const params: Record<string, string> = {};
     const sort = this._sortState();
     if (sort?.active && sort.direction) {
