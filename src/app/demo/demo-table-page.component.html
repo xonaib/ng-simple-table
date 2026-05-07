@@ -44,6 +44,19 @@
       <mat-button-toggle value="virtual">Virtual scroll</mat-button-toggle>
     </mat-button-toggle-group>
 
+    <mat-form-field class="dataset-size-field" subscriptSizing="dynamic">
+      <mat-label>Rows</mat-label>
+      <mat-select
+        [value]="selectedTaskCount()"
+        (selectionChange)="onTaskCountChange($event.value)"
+        aria-label="Dataset size"
+      >
+        @for (option of taskCountOptions; track option) {
+          <mat-option [value]="option">{{ option.toLocaleString() }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
     @if (selectedTasks().length > 0) {
       <div class="selection-badge">
         {{ selectedTasks().length }} task{{ selectedTasks().length === 1 ? '' : 's' }} selected

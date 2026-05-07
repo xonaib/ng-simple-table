@@ -1,7 +1,7 @@
 import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
-import { TASKS, Task } from './demo-data';
+import { DEFAULT_TASK_COUNT, generateTasks, Task } from './demo-data';
 
 export interface TasksResponse {
   data: Task[];
@@ -18,10 +18,11 @@ export const tasksInterceptor: HttpInterceptorFn = (req, next) => {
   const sizeRaw = p.get('size');
   const page    = Number(pageRaw ?? '0');
   const size    = sizeRaw != null ? Number(sizeRaw) : null; // null = return all
+  const count   = Number(p.get('count') ?? DEFAULT_TASK_COUNT);
   const sortCol = p.get('sort');
   const sortDir = p.get('direction') ?? 'asc';
 
-  let tasks = [...TASKS];
+  let tasks = generateTasks(count);
 
   // apply column filters — each param is a comma-separated list of selected values
   for (const col of FILTERABLE) {
