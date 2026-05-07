@@ -304,8 +304,8 @@
 }
 
 <!-- ---- bottom row: below actions + paginator in one flex line ----
-     Hidden entirely in virtual mode (virtual scroll replaces pagination). -->
-@if (!_isVirtual() && (tableConfig().isPaginated || _belowActions().length > 0)) {
+     Virtual scroll replaces pagination, but below actions still render. -->
+@if (_belowActions().length > 0 || (!_isVirtual() && tableConfig().isPaginated)) {
   <div class="st-bottom-row">
     @if (_belowActions().length > 0) {
       <div class="st-bottom-actions">
@@ -317,7 +317,7 @@
         }
       </div>
     }
-    @if (tableConfig().isPaginated) {
+    @if (!_isVirtual() && tableConfig().isPaginated) {
       <mat-paginator
         [length]="tableConfig().clientSide ? _matDs.filteredData.length : _effectiveLength()"
         [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"

@@ -37,7 +37,7 @@
 
     <mat-button-toggle-group
       [value]="isVirtual() ? 'virtual' : 'paginated'"
-      (change)="isVirtual.set($event.value === 'virtual')"
+      (change)="onScrollModeChange($event.value)"
       aria-label="Scroll mode"
     >
       <mat-button-toggle value="paginated">Paginated</mat-button-toggle>

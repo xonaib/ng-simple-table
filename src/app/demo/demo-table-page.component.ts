@@ -154,9 +154,10 @@ export class DemoTablePageComponent {
   // ---- HTTP params (server-side mode) ----
 
   private readonly _serverSideParams = computed((): Record<string, string> => {
+    const virtual = this.isVirtual();
     const params: Record<string, string> = {
-      page: String(this._pageIndex()),
-      size: String(this._pageSize()),
+      page: virtual ? '0' : String(this._pageIndex()),
+      size: String(virtual ? this.selectedTaskCount() : this._pageSize()),
       count: String(this.selectedTaskCount()),
     };
     const sort = this._sortState();
@@ -296,6 +297,12 @@ export class DemoTablePageComponent {
 
   onTaskCountChange(count: number): void {
     this.selectedTaskCount.set(count);
+    this.selectedTasks.set([]);
+    this._pageIndex.set(0);
+  }
+
+  onScrollModeChange(mode: 'paginated' | 'virtual'): void {
+    this.isVirtual.set(mode === 'virtual');
     this.selectedTasks.set([]);
     this._pageIndex.set(0);
   }

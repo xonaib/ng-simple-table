@@ -513,9 +513,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     effect(() => {
       if (this.tableConfig().clientSide) {
         const sort = this._sortRef();
-        const paginator = this._paginatorRef();
+        const paginator = this._isVirtual() ? null : this._paginatorRef();
         if (sort) this._matDs.sort = sort;
-        if (paginator) this._matDs.paginator = paginator;
+        this._matDs.paginator = paginator ?? null;
       } else {
         this._matDs.sort = null;
         this._matDs.paginator = null;

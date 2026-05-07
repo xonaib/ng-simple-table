@@ -120,6 +120,8 @@ cdk-virtual-scroll-viewport.st-table-wrapper {
 .st-bottom-row {
   display: flex;
   align-items: center;
+  min-height: 56px;
+  box-sizing: border-box;
   border-top: 1px solid var(--st-border-color);
 
   mat-paginator {
