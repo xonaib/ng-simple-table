@@ -26,7 +26,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { SelectionChange, SelectionModel } from '@angular/cdk/collections';
+import { CollectionViewer, DataSource, SelectionModel } from '@angular/cdk/collections';
+import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import {
   CdkDragDrop,
   CdkDrag,
@@ -37,7 +38,7 @@ import {
   CdkDropListGroup,
   moveItemInArray,
 } from '@angular/cdk/drag-drop';
-import { Observable, isObservable, of as observableOf } from 'rxjs';
+import { BehaviorSubject, Observable, ReplaySubject, Subscription, combineLatest, isObservable, map, of as observableOf, startWith, switchMap } from 'rxjs';
 import { ColumnFilterComponent } from './column-filter/column-filter.component';
 import { CellDefDirective } from './cell-def.directive';
 import { StExportDirective } from './st-export.directive';
@@ -51,7 +52,108 @@ import {
   TableAction,
   TableConfig,
   TableUserSettings,
+  VirtualRange,
 } from './table.types';
+
+// ---- Virtual scroll datasource (internal) ----
+
+/**
+ * Number of extra rows rendered above and below the visible window to
+ * reduce blank flashes during fast scrolling.
+ */
+const _VIRTUAL_BUFFER_ROWS = 3;
+
+/**
+ * Internal DataSource that integrates CdkVirtualScrollViewport with mat-table.
+ * Attach the viewport reference after view init — the ReplaySubject buffers it
+ * so connect() can be called (by mat-table) before attach().
+ */
+class _VirtualTableDataSource<T> extends DataSource<T> {
+  private readonly _data$ = new BehaviorSubject<T[]>([]);
+  private readonly _viewport$ = new ReplaySubject<CdkVirtualScrollViewport>(1);
+
+  /** Must match TableConfig.virtualRowHeight. Update before attaching the viewport. */
+  itemSize = 48;
+  totalLength = 0;
+  dataOffset = 0;
+
+  attach(vp: CdkVirtualScrollViewport): void {
+    this._viewport$.next(vp);
+
+    // CDK's built-in scroll strategy calls setRenderedContentOffset() which sets
+    // `transform: translateY(offset)` on .cdk-virtual-scroll-content-wrapper.
+    // A CSS transform creates a new stacking context that breaks `position: sticky`
+    // on the <thead> inside the viewport.
+    //
+    // Fix: replace the offset mechanism with `margin-top` on the content wrapper,
+    // which achieves the same visual offset without creating a stacking context.
+    // We no-op setRenderedContentOffset so CDK's strategy cannot re-apply the
+    // transform after we clear it.
+    (vp as any).setRenderedContentOffset = () => {};
+  }
+
+  set data(rows: T[]) {
+    this._data$.next(rows);
+  }
+
+  get data(): T[] {
+    return this._data$.value;
+  }
+
+  private _getWrapper(vp: CdkVirtualScrollViewport): HTMLElement | null {
+    return vp.elementRef.nativeElement.querySelector('.cdk-virtual-scroll-content-wrapper');
+  }
+
+  connect(_viewer: CollectionViewer): Observable<T[]> {
+    // We ignore the CollectionViewer because mat-table's viewChange always emits
+    // {start: 0, end: MAX_SAFE_INTEGER}. Instead we subscribe directly to the
+    // viewport's scroll position.
+    return this._viewport$.pipe(
+      switchMap((vp) =>
+        combineLatest([
+          this._data$,
+          vp.scrolledIndexChange.pipe(startWith(0)),
+        ]).pipe(
+          map(([data]) => {
+            const scrollOffset = vp.measureScrollOffset();
+            const startIdx = Math.max(
+              0,
+              Math.floor(scrollOffset / this.itemSize) - _VIRTUAL_BUFFER_ROWS,
+            );
+            const totalLength = Math.max(this.totalLength, data.length);
+            const endIdx = Math.min(
+              Math.ceil((scrollOffset + vp.getViewportSize()) / this.itemSize) + _VIRTUAL_BUFFER_ROWS,
+              totalLength,
+            );
+            const windowStart = Math.max(startIdx, this.dataOffset);
+            const windowEnd = Math.min(endIdx, this.dataOffset + data.length);
+            vp.setTotalContentSize(totalLength * this.itemSize);
+            vp.setRenderedRange({ start: windowStart, end: windowEnd });
+
+            // Position the rendered rows at their correct scroll-offset pixel position
+            // using margin-top instead of transform so sticky <thead> works correctly.
+            // Row N in the data is always at exactly N * itemSize px from the scroll-container top:
+            //   marginTop = renderedStart * itemSize
+            //   row K within rendered slice => marginTop + K * itemSize = (renderedStart + K) * itemSize
+            const wrapper = this._getWrapper(vp);
+            if (wrapper) {
+              wrapper.style.marginTop = `${windowStart * this.itemSize}px`;
+            }
+
+            if (windowEnd <= windowStart) return [];
+            return data.slice(windowStart - this.dataOffset, windowEnd - this.dataOffset);
+          }),
+        ),
+      ),
+    );
+  }
+
+  disconnect(): void {
+    // Intentionally not completing subjects — this instance is reused across mode changes.
+  }
+}
+
+// ---- Component ----
 
 const LAYOUT_WIDTH_FUDGE_PX = 2;
 /** Used only for layout-sum / filler when select has no explicit width (matches default CSS). */
@@ -82,6 +184,7 @@ const ST_SELECT_DEFAULT_SUM_PX = 52;
     CdkDragPreview,
     CdkDropList,
     CdkDropListGroup,
+    ScrollingModule,
     ColumnFilterComponent,
   ],
   templateUrl: './simple-table.component.html',
@@ -101,9 +204,39 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   // ---- selection model ----
   readonly selection = new SelectionModel<T>(true, []);
 
-  // ---- view children (used for client-side mode) ----
-  private readonly _sortRef = viewChild(MatSort);
+  // ---- view children ----
+  private readonly _sortRef      = viewChild(MatSort);
   private readonly _paginatorRef = viewChild(MatPaginator);
+  private readonly _viewportRef  = viewChild(CdkVirtualScrollViewport);
+
+  // ---- virtual scroll ----
+
+  readonly _isVirtual       = computed(() => this.tableConfig().virtual === true);
+  readonly _virtualRowHeight = computed(() => this.tableConfig().virtualRowHeight ?? 48);
+
+  /** Internal datasource used when virtual: true. */
+  private readonly _virtualDs = new _VirtualTableDataSource<T>();
+
+  /**
+   * Subscription that feeds filtered+sorted rows from MatTableDataSource into
+   * _virtualDs when in client-side virtual mode. Recreated on mode change.
+   */
+  private _virtualClientSub: Subscription | null = null;
+  private _virtualRangeSub: Subscription | null = null;
+  private _wasVirtual = false;
+  private _lastVirtualOffset = 0;
+
+  /**
+   * Resolves the active datasource for [dataSource] on mat-table.
+   * - virtual      → _virtualDs (CdkVirtualScrollViewport-aware DataSource)
+   * - clientSide   → _matDs     (MatTableDataSource — handles sort/filter/page)
+   * - server-side  → _data()    (plain array, host drives all state)
+   */
+  readonly _tableDataSource = computed<DataSource<T> | T[]>(() => {
+    if (this._isVirtual()) return this._virtualDs;
+    if (this.tableConfig().clientSide) return this._matDs;
+    return this._data();
+  });
 
   /** custom cell templates provided by the host via [cellDef] */
   readonly cellDefs = contentChildren(CellDefDirective);
@@ -124,6 +257,20 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * after a sort or filter change. Has no effect in client-side mode.
    */
   readonly pageIndex = input<number | undefined>(undefined);
+  /**
+   * The absolute row index (0-based) of the first row currently in `dataSource`.
+   * Only used in server-side virtual mode.
+   *
+   * When the host fetches a window of rows from the server in response to
+   * `(virtualRangeChange)`, it passes the window's start index here so the table
+   * can position those rows at the correct scroll offset in the full dataset.
+   *
+   * Example: if `length = 50000` and the host fetched rows 200–699, set
+   * `[virtualOffset]="200"` and `[length]="50000"`.
+   *
+   * Has no effect in client-side mode (offset is always 0).
+   */
+  readonly virtualOffset = input(0);
   readonly stickyHeaders = input(false);
   readonly selectedRows = input<T[] | undefined>();
   /**
@@ -179,6 +326,18 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly columnWidthChange = output<Record<string, number>>();
   /** emits the CSV string when the export button is clicked — host can save or process it */
   readonly dataExport = output<string>();
+  /**
+   * Emits whenever the user scrolls in server-side virtual mode, indicating
+   * which absolute row range is now visible (plus buffer rows).
+   *
+   * The host should react by fetching `dataSource[start..end]` from the server
+   * and updating `[dataSource]`, `[virtualOffset]`, and `[length]` accordingly.
+   *
+   * Payload: `{ start: number, end: number }` — absolute indices into the full dataset.
+   *
+   * Not emitted in client-side virtual mode (all data is already in memory).
+   */
+  readonly virtualRangeChange = output<VirtualRange>();
 
   // ---- internal state (template-accessible) ----
 
@@ -390,9 +549,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     effect(() => {
       if (this.tableConfig().clientSide) {
         const sort = this._sortRef();
-        const paginator = this._paginatorRef();
+        const paginator = this._isVirtual() ? null : this._paginatorRef();
         if (sort) this._matDs.sort = sort;
-        if (paginator) this._matDs.paginator = paginator;
+        this._matDs.paginator = paginator ?? null;
       } else {
         this._matDs.sort = null;
         this._matDs.paginator = null;
@@ -436,6 +595,100 @@ export class SimpleTableComponent<T> implements AfterContentInit {
         if (next.length === order.length && next.every((k, i) => k === order[i])) return order;
         return next;
       });
+    });
+
+    // ---- virtual scroll effects ----
+    //
+    // Two modes, one datasource (_virtualDs):
+    //
+    //  CLIENT-SIDE (clientSide: true)
+    //    All rows are already in memory. MatTableDataSource handles filtering and
+    //    sorting; _virtualDs receives the filtered+sorted array via connect() and
+    //    slices it to the visible window. No host coordination required.
+    //
+    //  SERVER-SIDE (clientSide: false)
+    //    The host owns fetching. The table emits (virtualRangeChange) as the user
+    //    scrolls. The host fetches that window from the server and binds:
+    //      [dataSource]    — the fetched rows for that window
+    //      [virtualOffset] — the absolute start index of the window (0-based)
+    //      [length]        — total row count across all pages
+    //    _virtualDs positions the window at the correct scroll offset using
+    //    margin-top (not CSS transform, which would break sticky headers).
+    //
+    // Effect 1: wire the viewport to _virtualDs on first appearance / config change.
+    // Effect 2: sync a new server-side window into _virtualDs when data/offset changes.
+    // Effect 3: subscribe to MatTableDataSource in client-side mode; recreate on toggle.
+    // Effect 4: subscribe to scrolledIndexChange to emit (virtualRangeChange) for the host.
+
+    // 1. Attach the viewport to _virtualDs once it exists in the view.
+    //    itemSize is also synced here so the datasource always has the latest value.
+    effect(() => {
+      const vp = this._viewportRef();
+      if (!vp) return;
+      this._virtualDs.itemSize = this._virtualRowHeight();
+      this._virtualDs.totalLength = this.tableConfig().clientSide ? this._data().length : this.length();
+      this._virtualDs.dataOffset = this.tableConfig().clientSide ? 0 : this.virtualOffset();
+      this._virtualDs.attach(vp);
+    });
+
+    effect(() => {
+      const isVirtual = this._isVirtual();
+      const offset = this.tableConfig().clientSide ? 0 : this.virtualOffset();
+      const vp = this._viewportRef();
+
+      if (isVirtual && vp && (!this._wasVirtual || offset < this._lastVirtualOffset)) {
+        queueMicrotask(() => vp.scrollToIndex(offset, 'auto'));
+      }
+
+      this._wasVirtual = isVirtual;
+      this._lastVirtualOffset = offset;
+    });
+
+    // 2. Server-side virtual: push _data() directly into _virtualDs.
+    effect(() => {
+      if (!this._isVirtual() || this.tableConfig().clientSide) return;
+      this._virtualDs.itemSize = this._virtualRowHeight();
+      this._virtualDs.totalLength = this.length();
+      this._virtualDs.dataOffset = this.virtualOffset();
+      this._virtualDs.data     = this._data();
+    });
+
+    // 3. Client-side virtual: subscribe to MatTableDataSource's filtered+sorted stream
+    //    so that sort and filter changes are reflected in the virtual viewport.
+    //    The subscription is re-created when the mode changes.
+    effect(() => {
+      this._virtualClientSub?.unsubscribe();
+      this._virtualClientSub = null;
+
+      if (!this._isVirtual() || !this.tableConfig().clientSide) return;
+
+      this._virtualDs.itemSize = this._virtualRowHeight();
+      this._virtualDs.totalLength = this._data().length;
+      this._virtualDs.dataOffset = 0;
+
+      // connect() (no args in Angular Material 17+) returns the filtered+sorted BehaviorSubject.
+      // Since no paginator is attached in virtual mode, this emits all filtered+sorted rows.
+      this._virtualClientSub = this._matDs.connect().subscribe((rows) => {
+        this._virtualDs.data = rows as T[];
+      });
+    });
+
+    effect(() => {
+      this._virtualRangeSub?.unsubscribe();
+      this._virtualRangeSub = null;
+
+      const vp = this._viewportRef();
+      if (!vp || !this._isVirtual() || this.tableConfig().clientSide) return;
+
+      this._virtualRangeSub = vp.scrolledIndexChange
+        .pipe(startWith(0))
+        .subscribe(() => this._emitVirtualRange(vp));
+    });
+
+    // Clean up virtual subscription on component destroy.
+    this._destroyRef.onDestroy(() => {
+      this._virtualClientSub?.unsubscribe();
+      this._virtualRangeSub?.unsubscribe();
     });
 
     afterNextRender(() => {
@@ -697,6 +950,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     this.columnOrderChange.emit([...order]);
   }
 
+
   /** Column chooser menu: reorder only; list order matches _chooserColumnDefs / _columnOrder. */
   onColumnChooserDrop(event: CdkDragDrop<void>): void {
     if (event.previousIndex === event.currentIndex) return;
@@ -763,12 +1017,25 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     return null;
   }
 
+  private _emitVirtualRange(vp: CdkVirtualScrollViewport): void {
+    const itemSize = this._virtualRowHeight();
+    const start = Math.max(0, Math.floor(vp.measureScrollOffset() / itemSize) - _VIRTUAL_BUFFER_ROWS);
+    const end = Math.min(
+      this.length(),
+      Math.ceil((vp.measureScrollOffset() + vp.getViewportSize()) / itemSize) + _VIRTUAL_BUFFER_ROWS,
+    );
+    this.virtualRangeChange.emit({ start, end });
+  }
+
   /**
    * Returns the rows currently visible in the table.
    * In client-side mode this is the current page slice from MatTableDataSource.
    * In server-side mode it is the full _data() array (the host already sliced it).
+   * In virtual mode (either client or server) all loaded rows are returned since
+   * the virtual viewport controls visibility — there is no paginator slice.
    */
   private _visibleRows(): T[] {
+    if (this._isVirtual()) return this._data();
     if (this.tableConfig().clientSide) {
       const paginator = this._paginatorRef();
       if (!paginator) return this._matDs.data;
@@ -789,7 +1056,6 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     event.preventDefault();
     event.stopPropagation();
 
-    // The mousedown target is the resize-handle span; walk up to the <th>
     const thEl = (event.currentTarget as HTMLElement).closest('th') as HTMLElement;
     const startX = event.clientX;
     const col = this.tableColumns().find((c) => c.key === colKey);

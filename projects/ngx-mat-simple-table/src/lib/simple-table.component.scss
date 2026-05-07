@@ -90,16 +90,48 @@
   }
 }
 
+// ---- virtual scroll viewport ----
+// CdkVirtualScrollViewport renders as display:block with overflow:auto by default.
+// We apply the same .st-table-wrapper classes so scrollbar theming is inherited,
+// then patch the few things that differ from the plain-div wrapper.
+
+cdk-virtual-scroll-viewport.st-table-wrapper {
+  &.st-horizontal-scroll {
+    overflow-x: auto;
+  }
+
+  &.st-fill-container {
+    flex: 1 1 auto;
+    min-height: 0;
+
+    table.simple-table {
+      border-bottom: 1px solid var(--st-border-color);
+    }
+  }
+
+  .cdk-virtual-scroll-content-wrapper {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+}
+
 // ---- bottom row: below-position actions + paginator in one flex line ----
 
 .st-bottom-row {
   display: flex;
   align-items: center;
+  min-height: 56px;
+  box-sizing: border-box;
   border-top: 1px solid var(--st-border-color);
 
   mat-paginator {
     flex: 1;
-    // reset the top border mat-paginator adds by default so our row border takes over
     border-top: none;
   }
 }

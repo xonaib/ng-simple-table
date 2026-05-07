@@ -228,7 +228,7 @@ Reorder columns at runtime by dragging header cells left and right.
 - Inline row editing (`isEditable` on `ColumnDef`, `editDef` content directive, `rowSave`/`rowCancel` outputs) — keeping editor out of the grid scope until unavoidable
 - Nested / Expandable Rows — `expandDef` directive, `expand` built-in column, signal-tracked expanded row IDs
 - Drag & Drop Row Reordering — CDK on `<tbody>`, `drag` built-in column, `rowReorder` output
-- Virtual scrolling (`CdkVirtualScrollViewport`) for large datasets
+- [x] Virtual scrolling (`CdkVirtualScrollViewport`) for large datasets — `virtual: true` in `TableConfig`; works in both client-side and server-side modes; `virtualRowHeight` configurable
 - Storybook stories per feature
 - Unit test suite (Vitest + Angular Testing Library)
 - StackBlitz live demo embed in README

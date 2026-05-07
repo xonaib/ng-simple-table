@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -7,7 +14,9 @@ import { map, tap } from 'rxjs/operators';
 import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSelectModule } from '@angular/material/select';
 import {
   SimpleTableComponent,
   CellDefDirective,
@@ -18,8 +27,9 @@ import {
   ItemParent,
   TableAction,
   TableConfig,
+  VirtualRange,
 } from 'ngx-mat-simple-table';
-import { Task, TASKS } from './demo-data';
+import { DEFAULT_TASK_COUNT, generateTasks, Task, TASK_COUNT_OPTIONS } from './demo-data';
 import { TasksResponse } from './tasks.interceptor';
 
 @Component({
@@ -31,7 +41,9 @@ import { TasksResponse } from './tasks.interceptor';
     StStateStoringDirective,
     StExportDirective,
     MatButtonToggleModule,
+    MatFormFieldModule,
     MatProgressBarModule,
+    MatSelectModule,
   ],
   templateUrl: './demo-table-page.component.html',
   styleUrl: './demo-table-page.component.scss',
@@ -55,33 +67,78 @@ export class DemoTablePageComponent {
 
   readonly columns: ColumnDef[] = [
     { key: 'select' },
-    { key: 'id',          label: 'ID',       width: 72,  sticky: 'left' },
-    { key: 'title',       label: 'Title',    width: 220, sticky: 'left', hasColumnFilters: true },
-    { key: 'assignee',    label: 'Assignee', width: 140, hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'status',      label: 'Status',   width: 140, hasColumnFilters: true, filterType: FilterType.DropDown,
-      displayValue: v => String(v ?? '').replace(/-/g, ' ').toUpperCase(),
-      cellClass: v => `status-${String(v ?? '')}` },
-    { key: 'priority',    label: 'Priority', width: 110, hasColumnFilters: true, filterType: FilterType.DropDown,
-      displayValue: v => String(v ?? '').toUpperCase(),
-      cellClass: v => `priority-${String(v ?? '')}` },
-    { key: 'team',        label: 'Team',     width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'sprint',      label: 'Sprint',   width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'reporter',    label: 'Reporter', width: 120, hasColumnFilters: true, filterType: FilterType.DropDown },
-    { key: 'estimate',    label: 'Estimate', width: 100 },
-    { key: 'tags',        label: 'Tags',     width: 180 },
-    { key: 'dueDate',     label: 'Due Date', width: 120 },
-    { key: 'storyPoints', label: 'Points',   width: 90 },
+    { key: 'id', label: 'ID', width: 72, sticky: 'left' },
+    { key: 'title', label: 'Title', width: 220, sticky: 'left', hasColumnFilters: true },
+    {
+      key: 'assignee',
+      label: 'Assignee',
+      width: 140,
+      hasColumnFilters: true,
+      filterType: FilterType.DropDown,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      width: 140,
+      hasColumnFilters: true,
+      filterType: FilterType.DropDown,
+      displayValue: (v: unknown) =>
+        String(v ?? '')
+          .replace(/-/g, ' ')
+          .toUpperCase(),
+      cellClass: (v: unknown) => `status-${String(v ?? '')}`,
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      width: 110,
+      hasColumnFilters: true,
+      filterType: FilterType.DropDown,
+      displayValue: (v: unknown) => String(v ?? '').toUpperCase(),
+      cellClass: (v: unknown) => `priority-${String(v ?? '')}`,
+    },
+    {
+      key: 'team',
+      label: 'Team',
+      width: 120,
+      hasColumnFilters: true,
+      filterType: FilterType.DropDown,
+    },
+    {
+      key: 'sprint',
+      label: 'Sprint',
+      width: 120,
+      hasColumnFilters: true,
+      filterType: FilterType.DropDown,
+    },
+    {
+      key: 'reporter',
+      label: 'Reporter',
+      width: 120,
+      hasColumnFilters: true,
+      filterType: FilterType.DropDown,
+    },
+    { key: 'estimate', label: 'Estimate', width: 100 },
+    { key: 'tags', label: 'Tags', width: 180 },
+    { key: 'dueDate', label: 'Due Date', width: 120 },
+    { key: 'storyPoints', label: 'Points', width: 90 },
   ];
 
   // ---- mode toggle ----
 
   readonly isClientSide = signal(false);
+  readonly isVirtual = signal(false);
+  readonly taskCountOptions = TASK_COUNT_OPTIONS;
+  readonly selectedTaskCount = signal(DEFAULT_TASK_COUNT);
+  private readonly _clientTasks = computed(() => generateTasks(this.selectedTaskCount()));
 
   readonly effectiveConfig = computed(
     (): TableConfig => ({
-      isPaginated: true,
+      isPaginated: !this.isVirtual(),
       paginationOptions: { defaultPageSize: 25, pageSizeOptions: [5, 10, 25, 50] },
       clientSide: this.isClientSide(),
+      virtual: this.isVirtual(),
+      virtualRowHeight: 48,
       horizontalScroll: true,
       fillContainer: true,
     }),
@@ -93,15 +150,24 @@ export class DemoTablePageComponent {
   private readonly _sortState = signal<Sort | null>(null);
   readonly _pageIndex = signal(0); // non-private: passed to simple-table [pageIndex]
   private readonly _pageSize = signal(25);
+  private readonly _serverVirtualRequestOffset = signal(0);
+  private readonly _serverVirtualLimit = signal(150);
   private readonly _refreshCounter = signal(0);
 
   // ---- HTTP params (server-side mode) ----
 
   private readonly _serverSideParams = computed((): Record<string, string> => {
+    const virtual = this.isVirtual();
     const params: Record<string, string> = {
-      page: String(this._pageIndex()),
-      size: String(this._pageSize()),
+      count: String(this.selectedTaskCount()),
     };
+    if (virtual) {
+      params['offset'] = String(this._serverVirtualRequestOffset());
+      params['limit'] = String(this._serverVirtualLimit());
+    } else {
+      params['page'] = String(this._pageIndex());
+      params['size'] = String(this._pageSize());
+    }
     const sort = this._sortState();
     if (sort?.active && sort.direction) {
       params['sort'] = sort.active;
@@ -139,14 +205,20 @@ export class DemoTablePageComponent {
           .pipe(tap(() => this.isLoading.set(false)));
       }),
     ),
-    { initialValue: { data: [] as Task[], total: 0 } },
+    { initialValue: { data: [] as Task[], total: 0, offset: 0 } },
+  );
+
+  readonly serverVirtualOffset = computed(() =>
+    this.isVirtual() && !this.isClientSide()
+      ? (this._serverResponse()?.offset ?? this._serverVirtualRequestOffset())
+      : 0,
   );
 
   // ---- data bound to the table ----
 
   /** full dataset in client-side mode; current page slice returned by the API in server-side mode */
   readonly effectiveDataSource = computed<Task[]>(() =>
-    this.isClientSide() ? TASKS : (this._serverResponse()?.data ?? []),
+    this.isClientSide() ? this._clientTasks() : (this._serverResponse()?.data ?? []),
   );
 
   /** ignored by the table in client-side mode (it counts rows itself) */
@@ -187,7 +259,7 @@ export class DemoTablePageComponent {
       label: 'Edit',
       icon: 'edit',
       position: 'row-inline',
-      cb: (row) => console.log('[demo] edit', row),
+      cb: (row: Task | undefined) => console.log('[demo] edit', row),
     },
     // 'row-menu' — items in the ⋯ overflow menu
     {
@@ -195,7 +267,7 @@ export class DemoTablePageComponent {
       label: 'Duplicate',
       icon: 'content_copy',
       position: 'row-menu',
-      cb: (row) => console.log('[demo] duplicate', row),
+      cb: (row: Task | undefined) => console.log('[demo] duplicate', row),
     },
     {
       id: 'delete',
@@ -203,7 +275,7 @@ export class DemoTablePageComponent {
       icon: 'delete',
       position: 'row-menu',
       color: 'warn',
-      cb: (row) => console.log('[demo] delete', row),
+      cb: (row: Task | undefined) => console.log('[demo] delete', row),
     },
     // 'below' — rendered on the left of the paginator row
     {
@@ -226,20 +298,57 @@ export class DemoTablePageComponent {
   onSortChange(sort: Sort): void {
     this._sortState.set(sort);
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
   }
 
   onFilterChange(filters: Map<string, ItemParent>): void {
     this._activeFilters.set(new Map(filters));
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
   }
 
   onSelectionChange(rows: Task[]): void {
     this.selectedTasks.set(rows);
   }
 
+  onTaskCountChange(count: number): void {
+    this.selectedTaskCount.set(count);
+    this.selectedTasks.set([]);
+    this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
+  }
+
+  onScrollModeChange(mode: 'paginated' | 'virtual'): void {
+    this.isVirtual.set(mode === 'virtual');
+    this.selectedTasks.set([]);
+    this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
+  }
+
   onRefresh(): void {
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
     this._refreshCounter.update((n) => n + 1);
+  }
+
+  onVirtualRangeChange(range: VirtualRange): void {
+    if (this.isClientSide() || !this.isVirtual()) return;
+
+    const loadedStart = this.serverVirtualOffset();
+    const requestedStart = this._serverVirtualRequestOffset();
+    const loadedRows = this._serverResponse()?.data.length ?? 0;
+    const loadedEnd = loadedStart + loadedRows;
+    const total = this.effectiveLength() || this.selectedTaskCount();
+    const edgeBuffer = 40;
+    const windowSize = this._serverVirtualLimit();
+
+    const outsideLoadedWindow = range.start < loadedStart || range.end > loadedEnd;
+    const nearTopEdge = loadedStart > 0 && range.start < loadedStart + edgeBuffer;
+    const nearBottomEdge = loadedEnd < total && range.end > loadedEnd - edgeBuffer;
+    if (!outsideLoadedWindow && !nearTopEdge && !nearBottomEdge) return;
+
+    const nextOffset = Math.max(0, Math.min(total - windowSize, range.start - edgeBuffer));
+    if (nextOffset !== requestedStart) this._serverVirtualRequestOffset.set(nextOffset);
   }
 
   onColumnOrderChange(order: string[]): void {
@@ -251,7 +360,9 @@ export class DemoTablePageComponent {
   }
 
   readonly getAllForExport = (): Promise<Task[]> => {
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = {
+      count: String(this.selectedTaskCount()),
+    };
     const sort = this._sortState();
     if (sort?.active && sort.direction) {
       params['sort'] = sort.active;
@@ -262,7 +373,7 @@ export class DemoTablePageComponent {
       if (keys.length > 0) params[col] = keys.map(String).join(',');
     }
     return firstValueFrom(
-      this._http.get<TasksResponse>('/api/tasks', { params }).pipe(map(r => r.data))
+      this._http.get<TasksResponse>('/api/tasks', { params }).pipe(map((r) => r.data)),
     );
   };
 }

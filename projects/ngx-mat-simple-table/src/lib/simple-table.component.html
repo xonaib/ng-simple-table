@@ -76,19 +76,18 @@
   </div>
 }
 
-<div
-  class="st-table-wrapper"
-  [class.st-horizontal-scroll]="_hasHorizontalScroll()"
-  [style.max-height]="!_fillContainer() ? _maxHeight() : null"
-  [class.st-has-max-height]="!_fillContainer() && !!_maxHeight()"
-  [class.st-fill-container]="_fillContainer()"
->
+<!--
+  The mat-table is declared once in #tableBody and rendered into whichever wrapper
+  is active — either the CdkVirtualScrollViewport (virtual mode) or the plain div.
+  Both wrappers share the same CSS classes so scrollbar theming etc. are consistent.
+-->
+<ng-template #tableBody>
   <table
     class="simple-table"
     [class.resizable]="_isResizable()"
     [class.st-table-fixed-layout]="_tableLayoutFixed()"
     mat-table
-    [dataSource]="tableConfig().clientSide ? _matDs : _data()"
+    [dataSource]="_tableDataSource()"
     matSort
     (matSortChange)="onSortChange($event)"
     cdkDropListGroup
@@ -278,10 +277,35 @@
       (click)="selection.toggle(row)"
     ></tr>
   </table>
-</div>
+</ng-template>
 
-<!-- ---- bottom row: below actions + paginator in one flex line ---- -->
-@if (tableConfig().isPaginated || _belowActions().length > 0) {
+<!-- ---- virtual scroll wrapper (virtual: true) ---- -->
+@if (_isVirtual()) {
+  <cdk-virtual-scroll-viewport
+    class="st-table-wrapper st-virtual-viewport"
+    [class.st-horizontal-scroll]="_hasHorizontalScroll()"
+    [class.st-fill-container]="_fillContainer()"
+    [itemSize]="_virtualRowHeight()"
+    [style.height]="!_fillContainer() ? (_maxHeight() ?? null) : null"
+  >
+    <ng-container [ngTemplateOutlet]="tableBody"></ng-container>
+  </cdk-virtual-scroll-viewport>
+} @else {
+  <!-- ---- standard wrapper (paginated or unpaginated) ---- -->
+  <div
+    class="st-table-wrapper"
+    [class.st-horizontal-scroll]="_hasHorizontalScroll()"
+    [style.max-height]="!_fillContainer() ? _maxHeight() : null"
+    [class.st-has-max-height]="!_fillContainer() && !!_maxHeight()"
+    [class.st-fill-container]="_fillContainer()"
+  >
+    <ng-container [ngTemplateOutlet]="tableBody"></ng-container>
+  </div>
+}
+
+<!-- ---- bottom row: below actions + paginator in one flex line ----
+     Virtual scroll replaces pagination, but below actions still render. -->
+@if (_belowActions().length > 0 || (!_isVirtual() && tableConfig().isPaginated)) {
   <div class="st-bottom-row">
     @if (_belowActions().length > 0) {
       <div class="st-bottom-actions">
@@ -293,7 +317,7 @@
         }
       </div>
     }
-    @if (tableConfig().isPaginated) {
+    @if (!_isVirtual() && tableConfig().isPaginated) {
       <mat-paginator
         [length]="tableConfig().clientSide ? _matDs.filteredData.length : _effectiveLength()"
         [pageSize]="tableConfig().paginationOptions?.defaultPageSize ?? 10"
@@ -308,9 +332,9 @@
 
 <!-- ---- reusable button template for above / toolbar / below positions ----
      Rendering rules:
-       - no label → always icon button, tooltip = action.id
-       - label + variant='icon' → icon button, tooltip = label
-       - label + variant='flat'|'text'|'stroked' (default) → labelled button with optional icon
+       - no label -> always icon button, tooltip = action.id
+       - label + variant='icon' -> icon button, tooltip = label
+       - label + variant='flat'|'text'|'stroked' (default) -> labelled button with optional icon
 -->
 <ng-template #globalActionBtn let-action>
   @if (!action.label || action.variant === 'icon') {

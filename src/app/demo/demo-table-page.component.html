@@ -35,6 +35,28 @@
       <mat-button-toggle value="client">Client-side</mat-button-toggle>
     </mat-button-toggle-group>
 
+    <mat-button-toggle-group
+      [value]="isVirtual() ? 'virtual' : 'paginated'"
+      (change)="onScrollModeChange($event.value)"
+      aria-label="Scroll mode"
+    >
+      <mat-button-toggle value="paginated">Paginated</mat-button-toggle>
+      <mat-button-toggle value="virtual">Virtual scroll</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-form-field class="dataset-size-field" subscriptSizing="dynamic">
+      <mat-label>Rows</mat-label>
+      <mat-select
+        [value]="selectedTaskCount()"
+        (selectionChange)="onTaskCountChange($event.value)"
+        aria-label="Dataset size"
+      >
+        @for (option of taskCountOptions; track option) {
+          <mat-option [value]="option">{{ option.toLocaleString() }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
     @if (selectedTasks().length > 0) {
       <div class="selection-badge">
         {{ selectedTasks().length }} task{{ selectedTasks().length === 1 ? '' : 's' }} selected
@@ -57,6 +79,7 @@
     [tableConfig]="effectiveConfig()"
     [length]="effectiveLength()"
     [pageIndex]="isClientSide() ? undefined : _pageIndex()"
+    [virtualOffset]="serverVirtualOffset()"
     [stickyHeaders]="true"
     [actions]="tableActions"
     (page)="onPage($event)"
@@ -64,6 +87,7 @@
     (filterChange)="onFilterChange($event)"
     (selectionChange)="onSelectionChange($event)"
     (refresh)="onRefresh()"
+    (virtualRangeChange)="onVirtualRangeChange($event)"
     (columnOrderChange)="onColumnOrderChange($event)"
     (columnWidthChange)="onColumnWidthChange($event)"
   >
