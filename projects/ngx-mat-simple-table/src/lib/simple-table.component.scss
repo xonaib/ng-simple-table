@@ -113,6 +113,12 @@ cdk-virtual-scroll-viewport.st-table-wrapper {
     width: 100%;
     min-width: 100%;
   }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
 }
 
 // ---- bottom row: below-position actions + paginator in one flex line ----

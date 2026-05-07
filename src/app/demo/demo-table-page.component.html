@@ -79,6 +79,7 @@
     [tableConfig]="effectiveConfig()"
     [length]="effectiveLength()"
     [pageIndex]="isClientSide() ? undefined : _pageIndex()"
+    [virtualOffset]="serverVirtualOffset()"
     [stickyHeaders]="true"
     [actions]="tableActions"
     (page)="onPage($event)"
@@ -86,6 +87,7 @@
     (filterChange)="onFilterChange($event)"
     (selectionChange)="onSelectionChange($event)"
     (refresh)="onRefresh()"
+    (virtualRangeChange)="onVirtualRangeChange($event)"
     (columnOrderChange)="onColumnOrderChange($event)"
     (columnWidthChange)="onColumnWidthChange($event)"
   >

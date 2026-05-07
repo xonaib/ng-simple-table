@@ -6,6 +6,7 @@ import { DEFAULT_TASK_COUNT, generateTasks, Task } from './demo-data';
 export interface TasksResponse {
   data: Task[];
   total: number;
+  offset?: number;
 }
 
 const FILTERABLE = ['title', 'assignee', 'status', 'priority', 'team', 'sprint', 'reporter'] as const;
@@ -16,8 +17,12 @@ export const tasksInterceptor: HttpInterceptorFn = (req, next) => {
   const p = req.params;
   const pageRaw = p.get('page');
   const sizeRaw = p.get('size');
+  const offsetRaw = p.get('offset');
+  const limitRaw = p.get('limit');
   const page    = Number(pageRaw ?? '0');
   const size    = sizeRaw != null ? Number(sizeRaw) : null; // null = return all
+  const offset  = offsetRaw != null ? Number(offsetRaw) : null;
+  const limit   = limitRaw != null ? Number(limitRaw) : null;
   const count   = Number(p.get('count') ?? DEFAULT_TASK_COUNT);
   const sortCol = p.get('sort');
   const sortDir = p.get('direction') ?? 'asc';
@@ -47,10 +52,13 @@ export const tasksInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const total = tasks.length;
-  const data  = size == null ? tasks : tasks.slice(page * size, page * size + size);
+  const start = offset ?? page * (size ?? total);
+  const take = limit ?? size;
+  const data  = take == null ? tasks : tasks.slice(start, start + take);
+  const responseDelay = offsetRaw != null || limitRaw != null ? 650 : 300;
 
-  console.log('[tasks-interceptor]', req.urlWithParams, { total, page, size });
-  return of(new HttpResponse<TasksResponse>({ status: 200, body: { data, total } })).pipe(
-    delay(300),
+  console.log('[tasks-interceptor]', req.urlWithParams, { total, page, size, offset, limit });
+  return of(new HttpResponse<TasksResponse>({ status: 200, body: { data, total, offset: start } })).pipe(
+    delay(responseDelay),
   );
 };

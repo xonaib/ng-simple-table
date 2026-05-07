@@ -100,6 +100,11 @@ export interface TableAction<T = unknown> {
   variant?: 'icon' | 'flat' | 'stroked' | 'text';
 }
 
+export interface VirtualRange {
+  start: number;
+  end: number;
+}
+
 export interface TableConfig {
   isPaginated?: boolean;
   paginationOptions?: PaginationOptions;

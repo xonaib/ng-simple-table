@@ -27,6 +27,7 @@ import {
   ItemParent,
   TableAction,
   TableConfig,
+  VirtualRange,
 } from 'ngx-mat-simple-table';
 import { DEFAULT_TASK_COUNT, generateTasks, Task, TASK_COUNT_OPTIONS } from './demo-data';
 import { TasksResponse } from './tasks.interceptor';
@@ -149,6 +150,8 @@ export class DemoTablePageComponent {
   private readonly _sortState = signal<Sort | null>(null);
   readonly _pageIndex = signal(0); // non-private: passed to simple-table [pageIndex]
   private readonly _pageSize = signal(25);
+  private readonly _serverVirtualRequestOffset = signal(0);
+  private readonly _serverVirtualLimit = signal(150);
   private readonly _refreshCounter = signal(0);
 
   // ---- HTTP params (server-side mode) ----
@@ -156,10 +159,15 @@ export class DemoTablePageComponent {
   private readonly _serverSideParams = computed((): Record<string, string> => {
     const virtual = this.isVirtual();
     const params: Record<string, string> = {
-      page: virtual ? '0' : String(this._pageIndex()),
-      size: String(virtual ? this.selectedTaskCount() : this._pageSize()),
       count: String(this.selectedTaskCount()),
     };
+    if (virtual) {
+      params['offset'] = String(this._serverVirtualRequestOffset());
+      params['limit'] = String(this._serverVirtualLimit());
+    } else {
+      params['page'] = String(this._pageIndex());
+      params['size'] = String(this._pageSize());
+    }
     const sort = this._sortState();
     if (sort?.active && sort.direction) {
       params['sort'] = sort.active;
@@ -197,7 +205,13 @@ export class DemoTablePageComponent {
           .pipe(tap(() => this.isLoading.set(false)));
       }),
     ),
-    { initialValue: { data: [] as Task[], total: 0 } },
+    { initialValue: { data: [] as Task[], total: 0, offset: 0 } },
+  );
+
+  readonly serverVirtualOffset = computed(() =>
+    this.isVirtual() && !this.isClientSide()
+      ? (this._serverResponse()?.offset ?? this._serverVirtualRequestOffset())
+      : 0,
   );
 
   // ---- data bound to the table ----
@@ -284,11 +298,13 @@ export class DemoTablePageComponent {
   onSortChange(sort: Sort): void {
     this._sortState.set(sort);
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
   }
 
   onFilterChange(filters: Map<string, ItemParent>): void {
     this._activeFilters.set(new Map(filters));
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
   }
 
   onSelectionChange(rows: Task[]): void {
@@ -299,17 +315,40 @@ export class DemoTablePageComponent {
     this.selectedTaskCount.set(count);
     this.selectedTasks.set([]);
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
   }
 
   onScrollModeChange(mode: 'paginated' | 'virtual'): void {
     this.isVirtual.set(mode === 'virtual');
     this.selectedTasks.set([]);
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
   }
 
   onRefresh(): void {
     this._pageIndex.set(0);
+    this._serverVirtualRequestOffset.set(0);
     this._refreshCounter.update((n) => n + 1);
+  }
+
+  onVirtualRangeChange(range: VirtualRange): void {
+    if (this.isClientSide() || !this.isVirtual()) return;
+
+    const loadedStart = this.serverVirtualOffset();
+    const requestedStart = this._serverVirtualRequestOffset();
+    const loadedRows = this._serverResponse()?.data.length ?? 0;
+    const loadedEnd = loadedStart + loadedRows;
+    const total = this.effectiveLength() || this.selectedTaskCount();
+    const edgeBuffer = 40;
+    const windowSize = this._serverVirtualLimit();
+
+    const outsideLoadedWindow = range.start < loadedStart || range.end > loadedEnd;
+    const nearTopEdge = loadedStart > 0 && range.start < loadedStart + edgeBuffer;
+    const nearBottomEdge = loadedEnd < total && range.end > loadedEnd - edgeBuffer;
+    if (!outsideLoadedWindow && !nearTopEdge && !nearBottomEdge) return;
+
+    const nextOffset = Math.max(0, Math.min(total - windowSize, range.start - edgeBuffer));
+    if (nextOffset !== requestedStart) this._serverVirtualRequestOffset.set(nextOffset);
   }
 
   onColumnOrderChange(order: string[]): void {

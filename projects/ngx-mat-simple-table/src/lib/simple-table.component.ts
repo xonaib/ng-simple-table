@@ -52,6 +52,7 @@ import {
   TableAction,
   TableConfig,
   TableUserSettings,
+  VirtualRange,
 } from './table.types';
 
 // ---- Virtual scroll datasource (internal) ----
@@ -73,6 +74,8 @@ class _VirtualTableDataSource<T> extends DataSource<T> {
 
   /** Must match TableConfig.virtualRowHeight. Update before attaching the viewport. */
   itemSize = 48;
+  totalLength = 0;
+  dataOffset = 0;
 
   attach(vp: CdkVirtualScrollViewport): void {
     this._viewport$.next(vp);
@@ -117,24 +120,28 @@ class _VirtualTableDataSource<T> extends DataSource<T> {
               0,
               Math.floor(scrollOffset / this.itemSize) - _VIRTUAL_BUFFER_ROWS,
             );
+            const totalLength = Math.max(this.totalLength, data.length);
             const endIdx = Math.min(
               Math.ceil((scrollOffset + vp.getViewportSize()) / this.itemSize) + _VIRTUAL_BUFFER_ROWS,
-              data.length,
+              totalLength,
             );
-            vp.setTotalContentSize(data.length * this.itemSize);
-            vp.setRenderedRange({ start: startIdx, end: endIdx });
+            const windowStart = Math.max(startIdx, this.dataOffset);
+            const windowEnd = Math.min(endIdx, this.dataOffset + data.length);
+            vp.setTotalContentSize(totalLength * this.itemSize);
+            vp.setRenderedRange({ start: windowStart, end: windowEnd });
 
             // Position the rendered rows at their correct scroll-offset pixel position
             // using margin-top instead of transform so sticky <thead> works correctly.
             // Row N in the data is always at exactly N * itemSize px from the scroll-container top:
-            //   marginTop = startIdx * itemSize   (content starts at first rendered row position)
-            //   row K within rendered slice => marginTop + K * itemSize = (startIdx + K) * itemSize ✓
+            //   marginTop = renderedStart * itemSize
+            //   row K within rendered slice => marginTop + K * itemSize = (renderedStart + K) * itemSize
             const wrapper = this._getWrapper(vp);
             if (wrapper) {
-              wrapper.style.marginTop = `${startIdx * this.itemSize}px`;
+              wrapper.style.marginTop = `${windowStart * this.itemSize}px`;
             }
 
-            return data.slice(startIdx, endIdx);
+            if (windowEnd <= windowStart) return [];
+            return data.slice(windowStart - this.dataOffset, windowEnd - this.dataOffset);
           }),
         ),
       ),
@@ -215,6 +222,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * _virtualDs when in client-side virtual mode. Recreated on mode change.
    */
   private _virtualClientSub: Subscription | null = null;
+  private _virtualRangeSub: Subscription | null = null;
+  private _wasVirtual = false;
+  private _lastVirtualOffset = 0;
 
   /**
    * Resolves the active datasource for [dataSource] on mat-table.
@@ -247,6 +257,7 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * after a sort or filter change. Has no effect in client-side mode.
    */
   readonly pageIndex = input<number | undefined>(undefined);
+  readonly virtualOffset = input(0);
   readonly stickyHeaders = input(false);
   readonly selectedRows = input<T[] | undefined>();
   /**
@@ -302,6 +313,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly columnWidthChange = output<Record<string, number>>();
   /** emits the CSV string when the export button is clicked — host can save or process it */
   readonly dataExport = output<string>();
+  /** emits the absolute row range needed by the viewport in virtual mode */
+  readonly virtualRangeChange = output<VirtualRange>();
 
   // ---- internal state (template-accessible) ----
 
@@ -569,13 +582,30 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       const vp = this._viewportRef();
       if (!vp) return;
       this._virtualDs.itemSize = this._virtualRowHeight();
+      this._virtualDs.totalLength = this.tableConfig().clientSide ? this._data().length : this.length();
+      this._virtualDs.dataOffset = this.tableConfig().clientSide ? 0 : this.virtualOffset();
       this._virtualDs.attach(vp);
+    });
+
+    effect(() => {
+      const isVirtual = this._isVirtual();
+      const offset = this.tableConfig().clientSide ? 0 : this.virtualOffset();
+      const vp = this._viewportRef();
+
+      if (isVirtual && vp && (!this._wasVirtual || offset < this._lastVirtualOffset)) {
+        queueMicrotask(() => vp.scrollToIndex(offset, 'auto'));
+      }
+
+      this._wasVirtual = isVirtual;
+      this._lastVirtualOffset = offset;
     });
 
     // 2. Server-side virtual: push _data() directly into _virtualDs.
     effect(() => {
       if (!this._isVirtual() || this.tableConfig().clientSide) return;
       this._virtualDs.itemSize = this._virtualRowHeight();
+      this._virtualDs.totalLength = this.length();
+      this._virtualDs.dataOffset = this.virtualOffset();
       this._virtualDs.data     = this._data();
     });
 
@@ -589,6 +619,8 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       if (!this._isVirtual() || !this.tableConfig().clientSide) return;
 
       this._virtualDs.itemSize = this._virtualRowHeight();
+      this._virtualDs.totalLength = this._data().length;
+      this._virtualDs.dataOffset = 0;
 
       // connect() (no args in Angular Material 17+) returns the filtered+sorted BehaviorSubject.
       // Since no paginator is attached in virtual mode, this emits all filtered+sorted rows.
@@ -597,8 +629,23 @@ export class SimpleTableComponent<T> implements AfterContentInit {
       });
     });
 
+    effect(() => {
+      this._virtualRangeSub?.unsubscribe();
+      this._virtualRangeSub = null;
+
+      const vp = this._viewportRef();
+      if (!vp || !this._isVirtual() || this.tableConfig().clientSide) return;
+
+      this._virtualRangeSub = vp.scrolledIndexChange
+        .pipe(startWith(0))
+        .subscribe(() => this._emitVirtualRange(vp));
+    });
+
     // Clean up virtual subscription on component destroy.
-    this._destroyRef.onDestroy(() => this._virtualClientSub?.unsubscribe());
+    this._destroyRef.onDestroy(() => {
+      this._virtualClientSub?.unsubscribe();
+      this._virtualRangeSub?.unsubscribe();
+    });
 
     afterNextRender(() => {
       const el = this._hostEl.nativeElement;
@@ -924,6 +971,16 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     const m = /^(\d+(?:\.\d+)?)px$/i.exec(s);
     if (m) return parseFloat(m[1]);
     return null;
+  }
+
+  private _emitVirtualRange(vp: CdkVirtualScrollViewport): void {
+    const itemSize = this._virtualRowHeight();
+    const start = Math.max(0, Math.floor(vp.measureScrollOffset() / itemSize) - _VIRTUAL_BUFFER_ROWS);
+    const end = Math.min(
+      this.length(),
+      Math.ceil((vp.measureScrollOffset() + vp.getViewportSize()) / itemSize) + _VIRTUAL_BUFFER_ROWS,
+    );
+    this.virtualRangeChange.emit({ start, end });
   }
 
   /**
