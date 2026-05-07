@@ -1,0 +1,219 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+// ── Header ──────────────────────────────────────────────────────────────────
+
+.demo-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  flex-shrink: 0;
+}
+
+.demo-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--mat-sys-on-surface);
+}
+
+.demo-subtitle {
+  font-size: 14px;
+  color: var(--mat-sys-on-surface-variant);
+  margin: 0;
+  max-width: 680px;
+  line-height: 1.5;
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--mat-sys-surface-variant, #f1f3f4);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+}
+
+// ── Table wrapper ────────────────────────────────────────────────────────────
+
+.table-container {
+  margin: 0 24px 24px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+simple-table {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+// ── Assignee cell ────────────────────────────────────────────────────────────
+
+.assignee-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.assignee-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.assignee-name {
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--mat-sys-on-surface);
+}
+
+.assignee-team {
+  font-size: 11px;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+}
+
+// ── Title + tags cell ────────────────────────────────────────────────────────
+
+.title-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 0;
+}
+
+.task-title {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--mat-sys-on-surface);
+}
+
+.tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--mat-sys-surface-variant, #e8eaf6);
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+}
+
+// ── Status badge ─────────────────────────────────────────────────────────────
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+
+  .status-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    line-height: 14px;
+  }
+
+  &.status-done {
+    background: light-dark(#dcfce7, #14532d);
+    color: light-dark(#15803d, #86efac);
+  }
+
+  &.status-in-progress {
+    background: light-dark(#dbeafe, #1e3a5f);
+    color: light-dark(#1d4ed8, #93c5fd);
+  }
+
+  &.status-todo {
+    background: light-dark(#f1f5f9, #1e293b);
+    color: light-dark(#475569, #94a3b8);
+  }
+}
+
+// ── Priority cell ────────────────────────────────────────────────────────────
+
+.priority-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+
+  .priority-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+
+  &.priority-high   { color: light-dark(#b91c1c, #fca5a5); }
+  &.priority-medium { color: light-dark(#92400e, #fcd34d); }
+  &.priority-low    { color: var(--mat-sys-on-surface-variant); }
+}
+
+// ── Actions cell — two buttons in one cell ───────────────────────────────────
+
+.actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn {
+  // compact mat-stroked-button
+  min-width: unset !important;
+  height: 28px !important;
+  line-height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+
+  mat-icon {
+    font-size: 14px !important;
+    width: 14px !important;
+    height: 14px !important;
+    line-height: 1 !important;
+    margin-right: 3px !important;
+    vertical-align: middle !important;
+  }
+
+  &.action-btn--approve {
+    color: light-dark(#15803d, #86efac) !important;
+    border-color: light-dark(#15803d, #86efac) !important;
+  }
+}

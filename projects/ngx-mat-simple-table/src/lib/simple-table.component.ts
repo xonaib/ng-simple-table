@@ -356,6 +356,9 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     this.tableColumns().filter((col) => col.key !== 'select'),
   );
 
+  /** True when the host has included a 'select' column — gates row-click selection. */
+  readonly _hasSelect = computed(() => this.tableColumns().some((c) => c.key === 'select'));
+
   /**
    * Same defs as _allDataColumns but ordered by _columnOrder (for the column chooser menu).
    * Appends any column missing from the order (e.g. host added a column at runtime).

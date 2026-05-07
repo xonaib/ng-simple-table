@@ -1,0 +1,73 @@
+<div class="demo-header">
+  <div>
+    <h1 class="demo-title">Rich Cells Demo</h1>
+    <p class="demo-subtitle">
+      Custom <code>cellDef</code> templates — images, multi-line content, status badges, and inline buttons,
+      all inside the same cell. Drag columns, filter, and sort work exactly as in the standard demo.
+    </p>
+  </div>
+</div>
+
+<div class="table-container">
+  <simple-table
+    tableId="rich-cells-table"
+    [dataSource]="tasks"
+    [tableColumns]="columns"
+    [tableConfig]="tableConfig"
+  >
+
+    <!-- ── Assignee: avatar  +  name  +  team label ── -->
+    <ng-template [cellDef]="'assignee'" let-row>
+      <div class="assignee-cell">
+        <div class="avatar" [style.background]="getAvatarColor(row.assignee)">
+          {{ row.assignee[0] }}
+        </div>
+        <div class="assignee-info">
+          <span class="assignee-name">{{ row.assignee }}</span>
+          <span class="assignee-team">{{ row.team }}</span>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- ── Title: bold task name  +  tag chips below ── -->
+    <ng-template [cellDef]="'title'" let-row>
+      <div class="title-cell">
+        <span class="task-title">{{ row.title }}</span>
+        <div class="tags-row">
+          @for (tag of splitTags(row.tags); track tag) {
+            <span class="tag-chip">{{ tag }}</span>
+          }
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- ── Status: coloured chip  +  icon ── -->
+    <ng-template [cellDef]="'status'" let-row>
+      <div class="status-badge status-{{ row.status }}">
+        <mat-icon class="status-icon">{{ statusIcon(row.status) }}</mat-icon>
+        <span>{{ statusLabel(row.status) }}</span>
+      </div>
+    </ng-template>
+
+    <!-- ── Priority: directional icon  +  label ── -->
+    <ng-template [cellDef]="'priority'" let-row>
+      <div class="priority-cell priority-{{ row.priority }}">
+        <mat-icon class="priority-icon">{{ priorityIcon(row.priority) }}</mat-icon>
+        <span>{{ row.priority | titlecase }}</span>
+      </div>
+    </ng-template>
+
+    <!-- ── Row actions: two buttons in the same cell ── -->
+    <ng-template [cellDef]="'rowActions'" let-row>
+      <div class="actions-cell">
+        <button mat-stroked-button class="action-btn" (click)="onEdit(row)">
+          <mat-icon>edit</mat-icon>Edit
+        </button>
+        <button mat-stroked-button class="action-btn action-btn--approve" (click)="onApprove(row)">
+          <mat-icon>thumb_up</mat-icon>Approve
+        </button>
+      </div>
+    </ng-template>
+
+  </simple-table>
+</div>
