@@ -36,6 +36,7 @@ Each column is identified by a **`key`** string: it is both the `matColumnDef` i
 | Custom cell templates | `cellDef` attribute on `<ng-template>` — value must match the column `key` |
 | State persistence | `StStateStoringDirective` saves column order, visibility, and widths to `localStorage` |
 | Export to Excel | `StExportDirective` with full XLSX via ExcelJS; export all records via `allDataProvider` |
+| **Virtual scroll** | `TableConfig.virtual: true` — renders only visible rows via `CdkVirtualScrollViewport`; works in client-side and server-side modes |
 | CSS theming | 22 `--st-*` custom properties for colours, borders, font, row height, scrollbar, and sticky cells |
 | Dark mode | Set `body { color-scheme: dark }` — all `--st-*` tokens and Angular Material tokens flip automatically |
 | OnPush + signals | `ChangeDetectionStrategy.OnPush` throughout; zero `ChangeDetectorRef` usage |
@@ -146,6 +147,8 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `columnDraggable` | `boolean` | `true` | Enable column drag-reorder. |
 | `columnResizable` | `boolean` | `true` | Enable column resize handles. |
 | `maxHeight` | `string` | — | CSS max-height on the scroll wrapper (ignored when `fillContainer` is true). |
+| `virtual` | `boolean` | `false` | Enable virtual scrolling. Replaces the paginator with a `CdkVirtualScrollViewport` that only renders visible rows. Requires a defined height — use `fillContainer: true` or `maxHeight`. |
+| `virtualRowHeight` | `number` | `48` | Pixel height of each data row. **Must match the actual rendered row height** (same as `--st-row-height`). |
 
 ## Inputs
 
@@ -159,6 +162,7 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `pageIndex` | `number` | — | Sync paginator when the host resets the page (server-side). |
 | `selectedRows` | `T[]` | — | Pre-select rows programmatically. |
 | `stickyHeaders` | `boolean` | `false` | Sticky header row. |
+| `virtualOffset` | `number` | `0` | Server-side virtual scroll only. The absolute row index (0-based) of the first row in `dataSource`. See [Virtual scroll — server-side](#server-side-virtual-scroll). |
 
 ## Outputs
 
@@ -171,6 +175,7 @@ When a cell needs more than plain text — a link, a badge, a chip — add an `<
 | `refresh` | `void` | Refresh toolbar button clicked. |
 | `columnOrderChange` | `string[]` | Data column keys after header drag-reorder. |
 | `columnWidthChange` | `Record<string, number>` | Column widths in px after resize. |
+| `virtualRangeChange` | `VirtualRange` | Server-side virtual scroll only. Emits `{ start, end }` as the user scrolls — the host should fetch that window and update `[dataSource]`, `[virtualOffset]`, and `[length]`. |
 
 ## Theming
 
@@ -350,6 +355,83 @@ If your API doesn't return a total row count, omit `[length]`. The table infers 
 </simple-table>
 ```
 
+
+## Virtual scroll
+
+Set `virtual: true` in `TableConfig` to replace pagination with `CdkVirtualScrollViewport`. Only the rows visible in the viewport (plus a small buffer) are in the DOM, keeping rendering fast for large datasets.
+
+**Requirements:**
+- The table must have a defined height. Use `fillContainer: true` (recommended) or `maxHeight`.
+- `virtualRowHeight` must equal the actual rendered row height in pixels (default `48`, matching `--st-row-height`).
+
+### Client-side virtual scroll
+
+Pass the entire dataset as `dataSource`. The table filters, sorts, and virtualises it internally — no additional wiring needed.
+
+```typescript
+tableConfig: TableConfig = {
+  virtual:          true,
+  virtualRowHeight: 48,
+  clientSide:       true,
+  fillContainer:    true,
+};
+```
+
+```html
+<simple-table
+  [dataSource]="allRows"
+  [tableColumns]="columns"
+  [tableConfig]="tableConfig"
+  [stickyHeaders]="true"
+>
+</simple-table>
+```
+
+### Server-side virtual scroll
+
+The table emits `(virtualRangeChange)` as the user scrolls. The host fetches the requested window from the server and passes it back with the window's absolute start index (`[virtualOffset]`) and the total row count (`[length]`).
+
+```typescript
+tableConfig: TableConfig = {
+  virtual:          true,
+  virtualRowHeight: 48,
+  fillContainer:    true,
+};
+
+// --- state in the host component ---
+readonly rows         = signal<Row[]>([]);
+readonly totalCount   = signal(0);
+readonly windowOffset = signal(0);
+
+onVirtualRangeChange(range: VirtualRange): void {
+  // range.start / range.end are absolute indices into the full dataset.
+  // Fetch the window from your API and update the signals.
+  this.http.get<{ data: Row[]; total: number }>('/api/rows', {
+    params: { offset: range.start, limit: range.end - range.start },
+  }).subscribe(({ data, total }) => {
+    this.rows.set(data);
+    this.totalCount.set(total);
+    this.windowOffset.set(range.start);
+  });
+}
+```
+
+```html
+<simple-table
+  [dataSource]="rows()"
+  [tableColumns]="columns"
+  [tableConfig]="tableConfig"
+  [length]="totalCount()"
+  [virtualOffset]="windowOffset()"
+  [stickyHeaders]="true"
+  (virtualRangeChange)="onVirtualRangeChange($event)"
+>
+</simple-table>
+```
+
+**How the table positions the window:**
+Each row `N` in the full dataset sits at pixel `N × virtualRowHeight` from the top of the scroll container. When the host provides rows `[offset … offset+n]`, the table sets `margin-top: offset × virtualRowHeight` on the content wrapper, placing those rows at exactly the right scroll position. `length × virtualRowHeight` drives the scrollbar height so the full range is scrollable immediately.
+
 ## State persistence
 
 Add `<st-state-storing />` inside `<simple-table>` and provide a unique `tableId`:
@@ -424,11 +506,10 @@ npm run publish:lib # runs build:lib then publishes dist/ngx-mat-simple-table to
 
 **v1.3**
 
-- Virtual scrolling for large datasets
 - `TableConfig.scrollbarVisibility: 'auto' | 'always' | 'hover'`
-- Date range filter type
 - Inline row editing
 - Storybook stories
+- Unit test suite
 
 ## License
 
@@ -444,52 +525,4 @@ MIT
 
 ### v1.2.2
 
-- **Declarative actions API** — `TableAction<T>[]` with five position slots (`toolbar`, `above`, `below`, `row-inline`, `row-menu`); icon-only buttons when `label` is omitted; `disabled` callback; `variant` controls Material button style
-- **Unknown-total pagination** — omit `[length]` in server-side mode and next/prev availability is inferred automatically from page row count
-- **Toolbar layout** — `above` and `toolbar` actions share one row with built-in controls; `below` actions share the paginator row, eliminating wasted vertical space
-- **Tooltips on built-in toolbar icons** — column chooser, export, and refresh buttons now show `matTooltip` labels
-- **`TableConfig` keys corrected** — `columnDraggable` / `columnResizable` (were `isDraggable` / `isResizable`)
-
-### v1.2.1
-
-- Fixed npm package README not reflecting v1.2 changes (was publishing stale library-level README)
-- Row hover now correctly overrides `cellClass` backgrounds for consistent hover behaviour across all cells
-- `publish:lib` script auto-syncs root README to library folder before every publish
-
-### v1.2.0
-
-- **Sticky columns** — `ColumnDef.sticky: 'left' | 'right'` pins columns to either edge during horizontal scroll; drag guard prevents sticky columns from being reordered
-- **`fillContainer` mode** — `TableConfig.fillContainer: true` makes the table stretch to fill its parent height; toolbar, sticky header, and paginator stay visible at all times
-- **`cellClass` callback** — `(value, row) => string | string[]` on `ColumnDef` for conditional body-cell CSS (colour-coded status, priority badges, etc.) without needing a custom template
-- **Dark mode** — all `--st-*` tokens alias Angular Material 3 system tokens so switching `body { color-scheme: dark }` adapts the full table automatically
-- **CSS custom properties expanded** — added `--st-cell-color` (body text colour) and `--st-row-bg` (default row background) to the theming surface; 22 tokens total covering every visual surface including filter popup and scrollbar
-- **Sticky cell background token** — `--st-sticky-cell-bg` (defaults to `surface-container`) gives pinned columns a subtle darker shade to distinguish them during horizontal scroll
-- **Column chooser responsive max-height** — `--st-chooser-max-height` caps the list at 320px by default with breakpoint overrides (220px tablet, 160px mobile)
-- **Filter popup CSS tokens** — 8 `--st-filter-*` tokens let consumers restyle the dropdown panel without touching Angular Material internals
-- **`applyUserSettings` column merge fix** — new columns added after a saved state are now appended rather than silently dropped
-
-### v1.1.2
-
-- Deployment and package stability fixes
-- Vercel build pipeline corrections
-
-### v1.1.0
-
-- **Export to Excel** — `StExportDirective` with full XLSX support via ExcelJS (header styling, column formatting)
-- **`displayValue` transform** — per-column `(value, row) => string` for display formatting
-- **Export-all-records** — `allDataProvider` callback fetches all matching rows for export in server-side mode
-- Library build pipeline via ng-packagr; published to npm as `ngx-mat-simple-table`
-
-### v1.0.0
-
-- **Declarative columns** — `ColumnDef[]` drives every aspect: label, width, sort, filter type, sticky side, displayValue
-- **Dual data-source mode** — server-side (host owns state signals) and client-side (`MatTableDataSource` owned internally)
-- **Custom cell templates** — `cellDef` directive for fully custom cell markup while keeping auto-generated sort headers
-- **Column-level dropdown filters** — builds option lists from visible data; Apply/Clear only
-- **Header drag-reorder** — CDK drag-drop; sticky columns excluded
-- **Column chooser** — toolbar menu with checkboxes and drag handles
-- **State persistence** — `StStateStoringDirective` saves to `localStorage`
-- **Export** — `StExportDirective` with ExcelJS
-- **Resize handles** — per-column drag; emits `(columnWidthChange)`
-- **`select` column** — built-in checkbox column with master toggle
-- **OnPush + signals throughout**
+- **Declarative actions API** — `TableAction<T>[]` with five

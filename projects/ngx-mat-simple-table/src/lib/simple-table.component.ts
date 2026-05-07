@@ -257,6 +257,19 @@ export class SimpleTableComponent<T> implements AfterContentInit {
    * after a sort or filter change. Has no effect in client-side mode.
    */
   readonly pageIndex = input<number | undefined>(undefined);
+  /**
+   * The absolute row index (0-based) of the first row currently in `dataSource`.
+   * Only used in server-side virtual mode.
+   *
+   * When the host fetches a window of rows from the server in response to
+   * `(virtualRangeChange)`, it passes the window's start index here so the table
+   * can position those rows at the correct scroll offset in the full dataset.
+   *
+   * Example: if `length = 50000` and the host fetched rows 200–699, set
+   * `[virtualOffset]="200"` and `[length]="50000"`.
+   *
+   * Has no effect in client-side mode (offset is always 0).
+   */
   readonly virtualOffset = input(0);
   readonly stickyHeaders = input(false);
   readonly selectedRows = input<T[] | undefined>();
@@ -313,7 +326,17 @@ export class SimpleTableComponent<T> implements AfterContentInit {
   readonly columnWidthChange = output<Record<string, number>>();
   /** emits the CSV string when the export button is clicked — host can save or process it */
   readonly dataExport = output<string>();
-  /** emits the absolute row range needed by the viewport in virtual mode */
+  /**
+   * Emits whenever the user scrolls in server-side virtual mode, indicating
+   * which absolute row range is now visible (plus buffer rows).
+   *
+   * The host should react by fetching `dataSource[start..end]` from the server
+   * and updating `[dataSource]`, `[virtualOffset]`, and `[length]` accordingly.
+   *
+   * Payload: `{ start: number, end: number }` — absolute indices into the full dataset.
+   *
+   * Not emitted in client-side virtual mode (all data is already in memory).
+   */
   readonly virtualRangeChange = output<VirtualRange>();
 
   // ---- internal state (template-accessible) ----
@@ -575,6 +598,27 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     });
 
     // ---- virtual scroll effects ----
+    //
+    // Two modes, one datasource (_virtualDs):
+    //
+    //  CLIENT-SIDE (clientSide: true)
+    //    All rows are already in memory. MatTableDataSource handles filtering and
+    //    sorting; _virtualDs receives the filtered+sorted array via connect() and
+    //    slices it to the visible window. No host coordination required.
+    //
+    //  SERVER-SIDE (clientSide: false)
+    //    The host owns fetching. The table emits (virtualRangeChange) as the user
+    //    scrolls. The host fetches that window from the server and binds:
+    //      [dataSource]    — the fetched rows for that window
+    //      [virtualOffset] — the absolute start index of the window (0-based)
+    //      [length]        — total row count across all pages
+    //    _virtualDs positions the window at the correct scroll offset using
+    //    margin-top (not CSS transform, which would break sticky headers).
+    //
+    // Effect 1: wire the viewport to _virtualDs on first appearance / config change.
+    // Effect 2: sync a new server-side window into _virtualDs when data/offset changes.
+    // Effect 3: subscribe to MatTableDataSource in client-side mode; recreate on toggle.
+    // Effect 4: subscribe to scrolledIndexChange to emit (virtualRangeChange) for the host.
 
     // 1. Attach the viewport to _virtualDs once it exists in the view.
     //    itemSize is also synced here so the datasource always has the latest value.
@@ -1012,7 +1056,6 @@ export class SimpleTableComponent<T> implements AfterContentInit {
     event.preventDefault();
     event.stopPropagation();
 
-    // The mousedown target is the resize-handle span; walk up to the <th>
     const thEl = (event.currentTarget as HTMLElement).closest('th') as HTMLElement;
     const startX = event.clientX;
     const col = this.tableColumns().find((c) => c.key === colKey);
