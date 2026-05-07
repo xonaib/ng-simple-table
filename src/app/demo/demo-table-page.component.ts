@@ -76,12 +76,15 @@ export class DemoTablePageComponent {
   // ---- mode toggle ----
 
   readonly isClientSide = signal(false);
+  readonly isVirtual    = signal(false);
 
   readonly effectiveConfig = computed(
     (): TableConfig => ({
-      isPaginated: true,
+      isPaginated:   !this.isVirtual(),
       paginationOptions: { defaultPageSize: 25, pageSizeOptions: [5, 10, 25, 50] },
-      clientSide: this.isClientSide(),
+      clientSide:    this.isClientSide(),
+      virtual:       this.isVirtual(),
+      virtualRowHeight: 48,
       horizontalScroll: true,
       fillContainer: true,
     }),

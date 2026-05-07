@@ -132,6 +132,26 @@ export interface TableConfig {
    * Takes precedence over maxHeight when both are set.
    */
   fillContainer?: boolean;
+  /**
+   * When true, rows are rendered through a CdkVirtualScrollViewport so only the
+   * visible slice of the dataset is in the DOM. Works in both client-side and
+   * server-side modes.
+   *
+   * - Client-side: all data is passed in; the table filters/sorts internally and
+   *   virtualises the result. The paginator is hidden.
+   * - Server-side: the host is responsible for loading the rows it wants shown
+   *   (e.g. a single large page); the table virtualises whatever it receives.
+   *
+   * Requires the viewport to have a defined height — set either `fillContainer: true`
+   * or `maxHeight`. false by default.
+   */
+  virtual?: boolean;
+  /**
+   * Pixel height of each data row, used by the virtual scroll viewport to
+   * calculate which rows are in view. Must match the rendered row height.
+   * Defaults to 48, which matches the `--st-row-height` CSS custom property.
+   */
+  virtualRowHeight?: number;
 }
 
 export interface PaginationOptions {

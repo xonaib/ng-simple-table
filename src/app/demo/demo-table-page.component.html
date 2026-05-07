@@ -35,6 +35,15 @@
       <mat-button-toggle value="client">Client-side</mat-button-toggle>
     </mat-button-toggle-group>
 
+    <mat-button-toggle-group
+      [value]="isVirtual() ? 'virtual' : 'paginated'"
+      (change)="isVirtual.set($event.value === 'virtual')"
+      aria-label="Scroll mode"
+    >
+      <mat-button-toggle value="paginated">Paginated</mat-button-toggle>
+      <mat-button-toggle value="virtual">Virtual scroll</mat-button-toggle>
+    </mat-button-toggle-group>
+
     @if (selectedTasks().length > 0) {
       <div class="selection-badge">
         {{ selectedTasks().length }} task{{ selectedTasks().length === 1 ? '' : 's' }} selected
